@@ -79,9 +79,9 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         synchronized(logLock) { tail.clear() }
 
         val port = freeLoopbackPort()
-        val target = EngineEndpoint(LOOPBACK, port)
+        val target = EngineEndpoint(AetherArgs.LOOPBACK, port)
 
-        val builder = ProcessBuilder(listOf(exe.absolutePath) + buildArgs(settings, port))
+        val builder = ProcessBuilder(listOf(exe.absolutePath) + AetherArgs.build(settings, port))
             .directory(context.filesDir)
             .redirectErrorStream(true)
         builder.environment()["HOME"] = context.filesDir.absolutePath
@@ -159,17 +159,8 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         }, "aether-log").apply { isDaemon = true }.start()
     }
 
-    /** Flags are real v2.4.0 options; every one of them is named so the core never asks. */
-    private fun buildArgs(s: VpnSettings, port: Int): List<String> = buildList {
-        add(s.mode.cliFlag)
-        if (s.mode.usesMasque) add(if (s.transport == Transport.HTTP2_TCP) "--h2" else "--h3")
-        addAll(listOf("--bind", "$LOOPBACK:$port"))
-        addAll(listOf("--turbo", "-4", "--quick-reconnect"))
-        addAll(listOf("--log-level", "info"))
-    }
-
     private fun freeLoopbackPort(): Int =
-        ServerSocket(0, 1, InetAddress.getByName(LOOPBACK)).use { it.localPort }
+        ServerSocket(0, 1, InetAddress.getByName(AetherArgs.LOOPBACK)).use { it.localPort }
 
     private fun lastLines(): String =
         synchronized(logLock) { tail.takeLast(5).joinToString(" | ") }.ifBlank { "(no output)" }
@@ -180,7 +171,6 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         const val CORE_VERSION = "2.4.0"
 
         private const val TAG = "AetherCore"
-        private const val LOOPBACK = "127.0.0.1"
         private const val START_TIMEOUT_MS = 90_000L
         private const val TAIL_LINES = 40
     }

@@ -64,7 +64,7 @@ fun AetherShieldApp() {
                 0 -> HomeScreen()
                 1 -> PlaceholderScreen(R.string.nav_sharing, R.string.todo_sharing)
                 2 -> DiagnosticsScreen()
-                3 -> PlaceholderScreen(R.string.nav_settings, R.string.todo_settings)
+                3 -> SettingsScreen()
                 else -> AboutScreen()
             }
         }
