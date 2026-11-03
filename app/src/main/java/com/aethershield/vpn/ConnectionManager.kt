@@ -3,6 +3,9 @@ package com.aethershield.vpn
 import com.aethershield.core.ConnectionState
 import com.aethershield.core.EngineEndpoint
 import com.aethershield.core.EngineStatus
+import com.aethershield.core.ExitFinder
+import com.aethershield.core.ExitInfo
+import com.aethershield.core.SocksExitFinder
 import com.aethershield.core.SocksProbe
 import com.aethershield.core.TrafficMeter
 import com.aethershield.core.TrafficSnapshot
@@ -15,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +28,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * The ONE authoritative connection lifecycle. Service, notification and UI all use this.
@@ -32,16 +37,17 @@ import kotlinx.coroutines.sync.withLock
  * withdrawn as soon as the core dies or stops answering. A dropped tunnel is retried with
  * backoff and reported as Reconnecting instead of leaving a stale "Connected" on screen.
  *
- * The same monitor loop that watches the tunnel also samples the forwarder's byte counters,
- * so [traffic] is live exactly while the tunnel is, and zero the rest of the time.
+ * The same monitor loop that watches the tunnel also samples the forwarder's byte counters
+ * ([traffic]) and, in a side coroutine, asks the exit what address it presents ([exitInfo]).
  *
- * Timings and the liveness probe are injectable so the state machine can be unit tested
- * without waiting for minutes of real time.
+ * Timings, the liveness probe and the exit lookup are injectable so the state machine can be
+ * unit tested without a network or minutes of real time.
  */
 class ConnectionManager(
     private val engine: TunnelEngine,
     private val timing: Timing = Timing(),
     private val probe: (EngineEndpoint) -> Boolean = DEFAULT_PROBE,
+    private val exitFinder: ExitFinder = SocksExitFinder,
 ) {
     data class Timing(
         /** How often the monitor wakes up; also the traffic sampling period. */
@@ -57,6 +63,10 @@ class ConnectionManager(
         val maxAttempts: Int = 5,
         val baseBackoffMs: Long = 1_000,
         val maxBackoffMs: Long = 15_000,
+        /** How often a known exit is re-checked, so a changed exit shows up on its own. */
+        val exitRefreshMs: Long = 60_000,
+        /** How often to retry when the exit could not be learned yet. */
+        val exitRetryMs: Long = 15_000,
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -68,6 +78,9 @@ class ConnectionManager(
 
     private val _traffic = MutableStateFlow(TrafficSnapshot())
     val traffic: StateFlow<TrafficSnapshot> = _traffic.asStateFlow()
+
+    private val _exit = MutableStateFlow<ExitInfo?>(null)
+    val exitInfo: StateFlow<ExitInfo?> = _exit.asStateFlow()
 
     @Volatile
     private var session: Job? = null
@@ -106,7 +119,7 @@ class ConnectionManager(
         if (accepted) running?.cancelAndJoin()
         host.detach()
         safeStop()
-        resetTraffic()
+        resetLiveState()
         _state.value = ConnectionState.Disconnected
     }
 
@@ -118,7 +131,7 @@ class ConnectionManager(
         session?.cancel()
         session = null
         engine.stopNow()
-        resetTraffic()
+        resetLiveState()
         _state.value = ConnectionState.Disconnected
     }
 
@@ -135,7 +148,7 @@ class ConnectionManager(
         while (currentCoroutineContext().isActive) {
             val startedAt = System.currentTimeMillis()
             try {
-                resetTraffic()
+                resetLiveState()
                 _state.value =
                     if (failures == 0) ConnectionState.Connecting else ConnectionState.Reconnecting
                 val endpoint = engine.start(settings)
@@ -160,19 +173,40 @@ class ConnectionManager(
                 fail(host, lastProblem)
                 return
             }
-            resetTraffic()
+            resetLiveState()
             _state.value = ConnectionState.Reconnecting
             delay(backoffMs(failures))
         }
     }
 
     /**
-     * Runs while the tunnel is up. Publishes traffic every tick, and returns as soon as the
-     * tunnel is no longer usable: the process is gone, or a real CONNECT through the SOCKS5
-     * proxy failed [Timing.probeMisses] times in a row. Throws CancellationException when the
-     * session is cancelled.
+     * Runs while the tunnel is up. The exit lookup is a side coroutine so a slow or blocked
+     * lookup can never delay the liveness checks.
      */
-    private suspend fun monitor(endpoint: EngineEndpoint, host: TunnelHost) {
+    private suspend fun monitor(endpoint: EngineEndpoint, host: TunnelHost) = coroutineScope {
+        // The lookup is cosmetic: whatever goes wrong in it, it may never take the tunnel
+        // down with it, so its failures are contained here instead of reaching the session.
+        val lookup = launch {
+            try {
+                pollExit(endpoint)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+            }
+        }
+        try {
+            watchLoop(endpoint, host)
+        } finally {
+            lookup.cancel()
+        }
+    }
+
+    /**
+     * Publishes traffic every tick and returns as soon as the tunnel is no longer usable:
+     * the process is gone, or a real CONNECT through the SOCKS5 proxy failed
+     * [Timing.probeMisses] times in a row. Throws CancellationException when cancelled.
+     */
+    private suspend fun watchLoop(endpoint: EngineEndpoint, host: TunnelHost) {
         var misses = 0
         val startedAt = System.currentTimeMillis()
         var lastProbe = startedAt
@@ -198,16 +232,32 @@ class ConnectionManager(
         }
     }
 
+    /** Keeps asking the exit what it is, until the tunnel goes away. */
+    private suspend fun pollExit(endpoint: EngineEndpoint) {
+        while (currentCoroutineContext().isActive) {
+            val info = try {
+                withContext(Dispatchers.IO) { exitFinder.find(endpoint.host, endpoint.port) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
+            if (info != null) _exit.value = info
+            delay(if (info != null) timing.exitRefreshMs else timing.exitRetryMs)
+        }
+    }
+
     private fun fail(host: TunnelHost, message: String) {
         engine.stopNow()
         host.detach()
-        resetTraffic()
+        resetLiveState()
         _state.value = ConnectionState.Error(message)
     }
 
-    private fun resetTraffic() {
+    private fun resetLiveState() {
         meter.reset()
         _traffic.value = TrafficSnapshot()
+        _exit.value = null
     }
 
     private suspend fun safeStop() {

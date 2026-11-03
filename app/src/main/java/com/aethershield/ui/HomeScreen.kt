@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,6 +56,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.aethershield.AppContainer
 import com.aethershield.R
 import com.aethershield.core.ConnectionState
+import com.aethershield.core.ExitInfo
 import com.aethershield.core.TrafficSnapshot
 import com.aethershield.core.Transport
 import com.aethershield.core.TunnelMode
@@ -81,6 +83,7 @@ class HomeViewModel(
 ) : ViewModel() {
     val state: StateFlow<ConnectionState> = manager.state
     val traffic: StateFlow<TrafficSnapshot> = manager.traffic
+    val exitInfo: StateFlow<ExitInfo?> = manager.exitInfo
     val settings: StateFlow<VpnSettings> =
         repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, VpnSettings())
 
@@ -136,6 +139,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
     val ctx = LocalContext.current
     val state by vm.state.collectAsState()
     val traffic by vm.traffic.collectAsState()
+    val exit by vm.exitInfo.collectAsState()
     val settings by vm.settings.collectAsState()
     var showSheet by remember { mutableStateOf(false) }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -193,6 +197,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
             }
             Text(formatElapsed(elapsed), color = scheme.onSurfaceVariant)
         }
+        ExitCard(info = exit, live = s is ConnectionState.Connected)
         if (s is ConnectionState.Error) {
             Card(colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainer)) {
                 Text(s.message, Modifier.padding(16.dp), color = scheme.error)
@@ -278,6 +283,38 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
         }
     }
 }
+
+@Composable
+private fun ExitCard(info: ExitInfo?, live: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainer)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.exit_title), fontSize = 12.sp, color = scheme.onSurfaceVariant)
+            val place = info?.let { entry ->
+                val name = countryName(entry.countryCode) ?: entry.countryCode
+                "$name (${entry.countryCode})"
+            }
+            Text(
+                text = place ?: if (live) stringResource(R.string.exit_checking) else PLACEHOLDER,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = info?.ip ?: "",
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                color = scheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Localised country name for an ISO code, or null when the code is not a country. */
+private fun countryName(code: String): String? = runCatching {
+    Locale.Builder().setRegion(code).build()
+        .getDisplayCountry(Locale.getDefault())
+        .ifBlank { null }
+}.getOrNull()
 
 @Composable
 private fun TrafficCard(

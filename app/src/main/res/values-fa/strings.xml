@@ -49,6 +49,8 @@
     <string name="ip_v4">فقط IPv4</string>
     <string name="ip_v6">فقط IPv6</string>
     <string name="ip_dual">هر دو (Dual stack)</string>
+    <string name="exit_title">سرور خروجی</string>
+    <string name="exit_checking">در حال بررسی…</string>
     <string name="traffic_up">آپلود</string>
     <string name="traffic_down">دانلود</string>
     <string name="todo_sharing">اشتراک‌گذاری VPN هنوز پیاده‌سازی نشده.</string>

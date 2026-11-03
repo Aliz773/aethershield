@@ -3,6 +3,8 @@ package com.aethershield.vpn
 import com.aethershield.core.ConnectionState
 import com.aethershield.core.EngineEndpoint
 import com.aethershield.core.EngineUnavailableException
+import com.aethershield.core.ExitFinder
+import com.aethershield.core.ExitInfo
 import com.aethershield.core.TrafficSnapshot
 import com.aethershield.core.TunCounters
 import com.aethershield.core.TunnelEngine
@@ -13,6 +15,7 @@ import com.aethershield.core.VpnSettings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -86,6 +89,8 @@ class ConnectionManagerTest {
         maxAttempts = maxAttempts,
         baseBackoffMs = baseBackoffMs,
         maxBackoffMs = maxBackoffMs,
+        exitRefreshMs = 60_000,
+        exitRetryMs = 60_000,
     )
 
     private fun waitUntil(what: String, timeoutMs: Long = 3_000, condition: () -> Boolean) {
@@ -179,14 +184,18 @@ class ConnectionManagerTest {
         // The proxy answers, but the CONNECTs it grants never carry anything: exactly what
         // a wedged core looks like from the outside.
         var failedProbesLeft = 2
-        val manager = ConnectionManager(engine, timing()) {
-            if (failedProbesLeft > 0) {
-                failedProbesLeft--
-                false
-            } else {
-                true
-            }
-        }
+        val manager = ConnectionManager(
+            engine,
+            timing(),
+            probe = {
+                if (failedProbesLeft > 0) {
+                    failedProbesLeft--
+                    false
+                } else {
+                    true
+                }
+            },
+        )
 
         manager.connect(VpnSettings(), host)
         waitUntil("reconnected after two dead probes") {
@@ -235,5 +244,32 @@ class ConnectionManagerTest {
 
         manager.stopNow(host)
         assertEquals("traffic must not survive the session", TrafficSnapshot(), manager.traffic.value)
+    }
+
+    @Test
+    fun theExitAddressIsPublishedWhileConnectedAndClearedAfterwards() {
+        val engine = FakeEngine()
+        val host = FakeHost()
+        var lookups = 0
+        val finder = ExitFinder { _, _ ->
+            lookups++
+            ExitInfo(ip = "203.0.113.9", countryCode = "DE", colo = "FRA")
+        }
+        val manager = ConnectionManager(
+            engine,
+            timing(),
+            probe = { true },
+            exitFinder = finder,
+        )
+
+        manager.connect(VpnSettings(), host)
+        waitUntil("exit learned") { manager.exitInfo.value?.ip == "203.0.113.9" }
+
+        assertEquals("DE", manager.exitInfo.value?.countryCode)
+        assertEquals("FRA", manager.exitInfo.value?.colo)
+        assertEquals(1, lookups)
+
+        manager.stopNow(host)
+        assertNull("a stale exit must not outlive the tunnel", manager.exitInfo.value)
     }
 }

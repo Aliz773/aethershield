@@ -49,6 +49,8 @@
     <string name="ip_v4">IPv4 only</string>
     <string name="ip_v6">IPv6 only</string>
     <string name="ip_dual">Dual stack</string>
+    <string name="exit_title">Exit server</string>
+    <string name="exit_checking">Checking…</string>
     <string name="traffic_up">Upload</string>
     <string name="traffic_down">Download</string>
     <string name="todo_sharing">VPN sharing is not implemented yet.</string>
