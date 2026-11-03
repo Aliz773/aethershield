@@ -92,4 +92,38 @@ class AetherArgsTest {
             assertTrue("$mode should pass $flag", a.contains(flag))
         }
     }
+
+    @Test
+    fun torOnlyRunsNoTunnelSoItGetsNoGatewayFlags() {
+        val a = args(VpnSettings(mode = TunnelMode.TOR_ONLY))
+
+        assertTrue(a.contains("--tor-only"))
+        assertEquals("the proxy still needs its port", "127.0.0.1:19000", a.valueOf("--bind"))
+        assertFalse("no masque carrier is involved", a.contains("--h3"))
+        assertFalse(a.contains("--h2"))
+        assertFalse("nothing to scan for", a.contains("--turbo"))
+        assertFalse(a.contains("-4"))
+        assertFalse(a.contains("--quick-reconnect"))
+    }
+
+    @Test
+    fun aCountryPolicyBecomesAnExitLocSpec() {
+        val blocking = args(VpnSettings(exit = ExitPolicy.Block("IR")))
+        assertEquals("!IR", blocking.valueOf("--exit-loc"))
+
+        val only = args(VpnSettings(exit = ExitPolicy.Only("de")))
+        assertEquals("codes are normalised", "DE", only.valueOf("--exit-loc"))
+    }
+
+    @Test
+    fun withoutAPolicyNothingIsPassed() {
+        assertFalse(args(VpnSettings()).contains("--exit-loc"))
+    }
+
+    @Test
+    fun aCountryPolicyAppliesToTorOnlyToo() {
+        val a = args(VpnSettings(mode = TunnelMode.TOR_ONLY, exit = ExitPolicy.Block("IR")))
+
+        assertEquals("!IR", a.valueOf("--exit-loc"))
+    }
 }

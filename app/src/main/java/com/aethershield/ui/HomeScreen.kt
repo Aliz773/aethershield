@@ -104,6 +104,7 @@ private fun TunnelMode.labelRes(): Int = when (this) {
     TunnelMode.GOOL -> R.string.mode_gool
     TunnelMode.GOOL_CLASSIC -> R.string.mode_gool_classic
     TunnelMode.MIM -> R.string.mode_mim
+    TunnelMode.TOR_ONLY -> R.string.mode_tor
 }
 
 @StringRes

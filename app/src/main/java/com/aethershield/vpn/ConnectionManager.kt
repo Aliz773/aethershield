@@ -5,6 +5,7 @@ import com.aethershield.core.EngineEndpoint
 import com.aethershield.core.EngineStatus
 import com.aethershield.core.ExitFinder
 import com.aethershield.core.ExitInfo
+import com.aethershield.core.ExitPolicy
 import com.aethershield.core.SocksExitFinder
 import com.aethershield.core.SocksProbe
 import com.aethershield.core.TrafficMeter
@@ -145,6 +146,11 @@ class ConnectionManager(
         var failures = 0
         var lastProblem = "the tunnel stopped answering"
 
+        // A country policy turns each attempt into "refuse this exit, try another gateway",
+        // so it needs more room than a plain connect before giving up.
+        val attemptBudget =
+            if (settings.exit === ExitPolicy.Any) timing.maxAttempts else timing.maxAttempts * 2
+
         while (currentCoroutineContext().isActive) {
             val startedAt = System.currentTimeMillis()
             try {
@@ -169,7 +175,7 @@ class ConnectionManager(
             // for a while earns a fresh budget of attempts.
             if (System.currentTimeMillis() - startedAt >= timing.healthySessionMs) failures = 0
             failures++
-            if (failures > timing.maxAttempts) {
+            if (failures > attemptBudget) {
                 fail(host, lastProblem)
                 return
             }

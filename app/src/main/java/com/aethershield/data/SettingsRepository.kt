@@ -10,6 +10,9 @@ import com.aethershield.core.ScanMode
 import com.aethershield.core.Transport
 import com.aethershield.core.TunnelMode
 import com.aethershield.core.VpnSettings
+import com.aethershield.core.decodeExitPolicy
+import com.aethershield.core.encodeForStorage
+import com.aethershield.core.ExitPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -21,6 +24,7 @@ class SettingsRepository(private val context: Context) {
     private val scanKey = stringPreferencesKey("scan")
     private val noizeKey = stringPreferencesKey("noize")
     private val ipKey = stringPreferencesKey("ip")
+    private val exitKey = stringPreferencesKey("exit")
 
     val settings: Flow<VpnSettings> = context.dataStore.data.map { p ->
         VpnSettings(
@@ -29,6 +33,7 @@ class SettingsRepository(private val context: Context) {
             scan = p[scanKey].toEnumOr(ScanMode.TURBO),
             noize = p[noizeKey].toEnumOr(NoizeProfile.AUTO),
             ip = p[ipKey].toEnumOr(IpVersion.IPV4),
+            exit = decodeExitPolicy(p[exitKey]),
         )
     }
 
@@ -54,6 +59,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setIpVersion(ip: IpVersion) {
         context.dataStore.edit { it[ipKey] = ip.name }
+    }
+
+    suspend fun setExitPolicy(policy: ExitPolicy) {
+        context.dataStore.edit { it[exitKey] = policy.encodeForStorage() }
     }
 
     /** A stored value can be stale (an enum renamed between versions); fall back quietly. */

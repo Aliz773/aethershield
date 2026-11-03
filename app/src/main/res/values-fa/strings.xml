@@ -26,6 +26,7 @@
     <string name="mode_gool">WARP روی MASQUE (gool)</string>
     <string name="mode_gool_classic">وایرگارد تو در تو کلاسیک (gool-classic)</string>
     <string name="mode_mim">MASQUE تو در تو (mim)</string>
+    <string name="mode_tor">فقط تور (بدون WARP)</string>
     <string name="transport_h3">HTTP/3 (QUIC)</string>
     <string name="transport_h2">HTTP/2 (TCP)</string>
     <string name="settings_scan">حالت اسکن</string>
@@ -51,6 +52,13 @@
     <string name="ip_dual">هر دو (Dual stack)</string>
     <string name="exit_title">سرور خروجی</string>
     <string name="exit_checking">در حال بررسی…</string>
+    <string name="exit_policy_title">کشور خروجی</string>
+    <string name="exit_policy_hint">هسته تونلی که کشور خروجی‌اش مجاز نباشد را رد می‌کند و دوباره تلاش می‌کند. برای گرفتن یک کشور مشخص، حالت اسکن بازتری انتخاب کن.</string>
+    <string name="exit_policy_any">بدون محدودیت</string>
+    <string name="exit_policy_not_iran">هر کشوری بجز ایران</string>
+    <string name="exit_policy_only">فقط این کشور</string>
+    <string name="exit_policy_pick">انتخاب کشور</string>
+    <string name="action_cancel">انصراف</string>
     <string name="traffic_up">آپلود</string>
     <string name="traffic_down">دانلود</string>
     <string name="todo_sharing">اشتراک‌گذاری VPN هنوز پیاده‌سازی نشده.</string>

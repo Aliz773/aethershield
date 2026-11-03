@@ -95,7 +95,9 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         endpoint = target
         pumpLogs(p)
 
-        awaitReady(p, target)
+        // Bootstrapping tor is measured in minutes on a filtered network, not seconds.
+        val timeout = if (settings.mode == TunnelMode.TOR_ONLY) TOR_TIMEOUT_MS else START_TIMEOUT_MS
+        awaitReady(p, target, timeout)
         target
     }
 
@@ -125,8 +127,8 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         }
     }
 
-    private suspend fun awaitReady(p: Process, target: EngineEndpoint) {
-        val deadline = System.currentTimeMillis() + START_TIMEOUT_MS
+    private suspend fun awaitReady(p: Process, target: EngineEndpoint, timeoutMs: Long) {
+        val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             currentCoroutineContext().ensureActive()
             if (!p.isAlive) {
@@ -138,7 +140,7 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         }
         stopInternal(graceful = false)
         throw EngineUnavailableException(
-            "Aether did not open SOCKS5 on ${target.port} within ${START_TIMEOUT_MS / 1000}s: ${lastLines()}"
+            "Aether did not open SOCKS5 on ${target.port} within ${timeoutMs / 1000}s: ${lastLines()}"
         )
     }
 
@@ -172,6 +174,7 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
 
         private const val TAG = "AetherCore"
         private const val START_TIMEOUT_MS = 90_000L
+        private const val TOR_TIMEOUT_MS = 240_000L
         private const val TAIL_LINES = 40
     }
 }

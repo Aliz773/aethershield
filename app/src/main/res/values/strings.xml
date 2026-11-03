@@ -26,6 +26,7 @@
     <string name="mode_gool">WARP over MASQUE (gool)</string>
     <string name="mode_gool_classic">Classic nested WireGuard (gool-classic)</string>
     <string name="mode_mim">Nested MASQUE (mim)</string>
+    <string name="mode_tor">Tor only (no WARP)</string>
     <string name="transport_h3">HTTP/3 (QUIC)</string>
     <string name="transport_h2">HTTP/2 (TCP)</string>
     <string name="settings_scan">Scan mode</string>
@@ -51,6 +52,13 @@
     <string name="ip_dual">Dual stack</string>
     <string name="exit_title">Exit server</string>
     <string name="exit_checking">Checking…</string>
+    <string name="exit_policy_title">Exit country</string>
+    <string name="exit_policy_hint">The core refuses a tunnel whose exit is not allowed and tries again. To land in a specific country, pair this with a broader scan mode.</string>
+    <string name="exit_policy_any">No restriction</string>
+    <string name="exit_policy_not_iran">Anything but Iran</string>
+    <string name="exit_policy_only">Only this country</string>
+    <string name="exit_policy_pick">Choose country</string>
+    <string name="action_cancel">Cancel</string>
     <string name="traffic_up">Upload</string>
     <string name="traffic_down">Download</string>
     <string name="todo_sharing">VPN sharing is not implemented yet.</string>
