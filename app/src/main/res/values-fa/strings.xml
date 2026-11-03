@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AetherShield</string>
+    <string name="nav_home">خانه</string>
+    <string name="nav_sharing">اشتراک‌گذاری</string>
+    <string name="nav_diagnostics">عیب‌یابی</string>
+    <string name="nav_settings">تنظیمات</string>
+    <string name="nav_about">درباره</string>
+    <string name="status_disconnected">قطع</string>
+    <string name="status_preparing">در حال آماده‌سازی…</string>
+    <string name="status_connecting">در حال اتصال…</string>
+    <string name="status_connected">متصل</string>
+    <string name="status_reconnecting">اتصال مجدد…</string>
+    <string name="status_disconnecting">در حال قطع…</string>
+    <string name="status_error">خطا</string>
+    <string name="btn_connect">اتصال</string>
+    <string name="btn_disconnect">قطع</string>
+    <string name="cfg_title">پیکربندی</string>
+    <string name="cfg_mode">حالت تونل</string>
+    <string name="cfg_transport">انتقال</string>
+    <string name="cfg_tap_to_change">برای تغییر لمس کنید</string>
+    <string name="cfg_locked">برای تغییر تنظیمات ابتدا قطع کنید</string>
+    <string name="cfg_transport_na">انتقال فقط برای حالت‌های مبتنی بر MASQUE کاربرد دارد</string>
+    <string name="mode_masque">MASQUE</string>
+    <string name="mode_wg">وایرگارد (WARP)</string>
+    <string name="mode_gool">WARP روی MASQUE (gool)</string>
+    <string name="mode_gool_classic">وایرگارد تو در تو کلاسیک (gool-classic)</string>
+    <string name="mode_mim">MASQUE تو در تو (mim)</string>
+    <string name="transport_h3">HTTP/3 (QUIC)</string>
+    <string name="transport_h2">HTTP/2 (TCP)</string>
+    <string name="traffic_up">آپلود</string>
+    <string name="traffic_down">دانلود</string>
+    <string name="todo_sharing">اشتراک‌گذاری VPN هنوز پیاده‌سازی نشده.</string>
+    <string name="todo_settings">تنظیمات عمومی هنوز پیاده‌سازی نشده.</string>
+    <string name="diag_state">وضعیت اتصال</string>
+    <string name="diag_core">هسته Aether</string>
+    <string name="diag_core_running">در حال اجرا · pid %1$d · پورت %2$d</string>
+    <string name="diag_core_starting">در حال راه‌اندازی…</string>
+    <string name="diag_core_exited">پایان یافته (کد %1$d)</string>
+    <string name="diag_core_stopped">متوقف</string>
+    <string name="diag_log">لاگ هسته (خطوط آخر)</string>
+    <string name="diag_log_empty">هنوز خروجی‌ای نیست.</string>
+    <string name="about_core_version">نسخه هسته</string>
+    <string name="about_license_note">قبل از انتشار اپ، مجوز Aether رو بررسی کن.</string>
+    <string name="notif_channel">وضعیت VPN</string>
+</resources>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AetherShield</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_sharing">Sharing</string>
+    <string name="nav_diagnostics">Diagnostics</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_about">About</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_preparing">Preparing…</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_reconnecting">Reconnecting…</string>
+    <string name="status_disconnecting">Disconnecting…</string>
+    <string name="status_error">Error</string>
+    <string name="btn_connect">Connect</string>
+    <string name="btn_disconnect">Disconnect</string>
+    <string name="cfg_title">Configuration</string>
+    <string name="cfg_mode">Tunnel mode</string>
+    <string name="cfg_transport">Transport</string>
+    <string name="cfg_tap_to_change">Tap to change</string>
+    <string name="cfg_locked">Disconnect to change settings</string>
+    <string name="cfg_transport_na">Transport applies only to MASQUE-based modes</string>
+    <string name="mode_masque">MASQUE</string>
+    <string name="mode_wg">WireGuard (WARP)</string>
+    <string name="mode_gool">WARP over MASQUE (gool)</string>
+    <string name="mode_gool_classic">Classic nested WireGuard (gool-classic)</string>
+    <string name="mode_mim">Nested MASQUE (mim)</string>
+    <string name="transport_h3">HTTP/3 (QUIC)</string>
+    <string name="transport_h2">HTTP/2 (TCP)</string>
+    <string name="traffic_up">Upload</string>
+    <string name="traffic_down">Download</string>
+    <string name="todo_sharing">VPN sharing is not implemented yet.</string>
+    <string name="todo_settings">General settings are not implemented yet.</string>
+    <string name="diag_state">Connection state</string>
+    <string name="diag_core">Aether core</string>
+    <string name="diag_core_running">Running · pid %1$d · port %2$d</string>
+    <string name="diag_core_starting">Starting…</string>
+    <string name="diag_core_exited">Exited (code %1$d)</string>
+    <string name="diag_core_stopped">Stopped</string>
+    <string name="diag_log">Core log (last lines)</string>
+    <string name="diag_log_empty">No output yet.</string>
+    <string name="about_core_version">Core version</string>
+    <string name="about_license_note">Check the Aether license before distributing this app.</string>
+    <string name="notif_channel">VPN status</string>
+</resources>
