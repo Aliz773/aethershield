@@ -47,7 +47,13 @@ object AetherArgs {
         if (mode.needsPsiphonBinary && psiphonBinary != null) {
             addAll(listOf("--psiphon-bin", psiphonBinary))
         }
-        settings.exit.cliSpec?.let { addAll(listOf("--exit-loc", it)) }
+        // Only Psiphon has selectable egress regions; a WARP exit is whatever edge the scan
+        // landed on, and `--exit-loc` (a reject filter, not a picker) proved useless in practice.
+        if (mode.hasSelectableCountry) {
+            settings.psiphonRegion?.takeIf { it.length == 2 }?.let {
+                addAll(listOf("--psiphon-region", it.uppercase()))
+            }
+        }
         addAll(listOf("--log-level", "info"))
     }
 }

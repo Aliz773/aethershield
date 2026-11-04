@@ -9,11 +9,8 @@ import com.aethershield.core.NoizeProfile
 import com.aethershield.core.ScanMode
 import com.aethershield.core.Transport
 import com.aethershield.core.TunnelMode
-import com.aethershield.core.mayUseMasque
 import com.aethershield.core.VpnSettings
-import com.aethershield.core.decodeExitPolicy
-import com.aethershield.core.encodeForStorage
-import com.aethershield.core.ExitPolicy
+import com.aethershield.core.mayUseMasque
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -25,7 +22,7 @@ class SettingsRepository(private val context: Context) {
     private val scanKey = stringPreferencesKey("scan")
     private val noizeKey = stringPreferencesKey("noize")
     private val ipKey = stringPreferencesKey("ip")
-    private val exitKey = stringPreferencesKey("exit")
+    private val regionKey = stringPreferencesKey("psiphon_region")
 
     val settings: Flow<VpnSettings> = context.dataStore.data.map { p ->
         VpnSettings(
@@ -34,7 +31,7 @@ class SettingsRepository(private val context: Context) {
             scan = p[scanKey].toEnumOr(ScanMode.TURBO),
             noize = p[noizeKey].toEnumOr(NoizeProfile.AUTO),
             ip = p[ipKey].toEnumOr(IpVersion.IPV4),
-            exit = decodeExitPolicy(p[exitKey]),
+            psiphonRegion = p[regionKey]?.takeIf { it.length == 2 }?.uppercase(),
         )
     }
 
@@ -62,8 +59,11 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[ipKey] = ip.name }
     }
 
-    suspend fun setExitPolicy(policy: ExitPolicy) {
-        context.dataStore.edit { it[exitKey] = policy.encodeForStorage() }
+    /** Null means "let Psiphon pick", which is the default and the safest on a bad network. */
+    suspend fun setPsiphonRegion(region: String?) {
+        context.dataStore.edit {
+            if (region == null) it.remove(regionKey) else it[regionKey] = region.uppercase()
+        }
     }
 
     /** A stored value can be stale (an enum renamed between versions); fall back quietly. */

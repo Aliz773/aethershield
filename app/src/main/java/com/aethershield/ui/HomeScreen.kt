@@ -61,6 +61,7 @@ import com.aethershield.core.TrafficSnapshot
 import com.aethershield.core.Transport
 import com.aethershield.core.TunnelMode
 import com.aethershield.core.VpnSettings
+import com.aethershield.core.hasSelectableCountry
 import com.aethershield.core.isIdle
 import com.aethershield.core.mayUseMasque
 import com.aethershield.core.labelRes
@@ -72,7 +73,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Locale
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -91,6 +91,7 @@ class HomeViewModel(
 
     fun setMode(m: TunnelMode) { viewModelScope.launch { repo.setMode(m) } }
     fun setTransport(t: Transport) { viewModelScope.launch { repo.setTransport(t) } }
+    fun setRegion(code: String?) { viewModelScope.launch { repo.setPsiphonRegion(code) } }
 
     companion object {
         val Factory = viewModelFactory {
@@ -130,19 +131,7 @@ private fun formatElapsed(ms: Long): String {
     return "%02d:%02d:%02d".format(s / 3600, (s % 3600) / 60, s % 60)
 }
 
-private fun formatBytes(bytes: Long): String {
-    if (bytes < 1024) return "$bytes B"
-    val units = arrayOf("KB", "MB", "GB", "TB")
-    var value = bytes.toDouble() / 1024
-    var i = 0
-    while (value >= 1024 && i < units.lastIndex) {
-        value /= 1024
-        i++
-    }
-    return String.format(Locale.getDefault(), "%.1f %s", value, units[i])
-}
 
-private fun formatRate(bytesPerSecond: Long): String = formatBytes(bytesPerSecond) + "/s"
 
 @Composable
 fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
@@ -153,6 +142,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
     val activeMode by vm.activeMode.collectAsState()
     val settings by vm.settings.collectAsState()
     var showSheet by remember { mutableStateOf(false) }
+    var showCountryPicker by remember { mutableStateOf(false) }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -233,6 +223,19 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
                     stringResource(R.string.cfg_transport),
                     if (settings.mode.mayUseMasque) stringResource(settings.transport.labelRes()) else PLACEHOLDER,
                 )
+                if (settings.mode.hasSelectableCountry) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clickable(enabled = s.isIdle) { showCountryPicker = true },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(stringResource(R.string.cfg_country), color = scheme.onSurfaceVariant)
+                        Text(
+                            settings.psiphonRegion?.let { countryLabel(it) }
+                                ?: stringResource(R.string.country_auto)
+                        )
+                    }
+                }
                 Text(stringResource(R.string.cfg_tap_to_change), fontSize = 12.sp, color = scheme.onSurfaceVariant)
             }
         }
@@ -256,6 +259,21 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
                 modifier = Modifier.weight(1f),
             )
         }
+    }
+
+    if (showCountryPicker) {
+        CountryPickerDialog(
+            selected = settings.psiphonRegion,
+            onDismiss = { showCountryPicker = false },
+            onPick = {
+                vm.setRegion(it)
+                showCountryPicker = false
+            },
+            onClear = {
+                vm.setRegion(null)
+                showCountryPicker = false
+            },
+        )
     }
 
     if (showSheet) {
@@ -329,13 +347,6 @@ private fun ExitCard(info: ExitInfo?, live: Boolean) {
         }
     }
 }
-
-/** Localised country name for an ISO code, or null when the code is not a country. */
-private fun countryName(code: String): String? = runCatching {
-    Locale.Builder().setRegion(code).build()
-        .getDisplayCountry(Locale.getDefault())
-        .ifBlank { null }
-}.getOrNull()
 
 @Composable
 private fun TrafficCard(

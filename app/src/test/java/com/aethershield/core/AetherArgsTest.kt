@@ -112,24 +112,24 @@ class AetherArgsTest {
     }
 
     @Test
-    fun aCountryPolicyBecomesAnExitLocSpec() {
-        val blocking = args(VpnSettings(exit = ExitPolicy.Block("IR")))
-        assertEquals("!IR", blocking.valueOf("--exit-loc"))
+    fun aPsiphonRegionBecomesTheRegionFlag() {
+        val a = args(VpnSettings(mode = TunnelMode.GOOL_PSIPHON, psiphonRegion = "de"))
 
-        val only = args(VpnSettings(exit = ExitPolicy.Only("de")))
-        assertEquals("codes are normalised", "DE", only.valueOf("--exit-loc"))
+        assertEquals("codes are normalised", "DE", a.valueOf("--psiphon-region"))
     }
 
     @Test
-    fun withoutAPolicyNothingIsPassed() {
-        assertFalse(args(VpnSettings()).contains("--exit-loc"))
+    fun aRegionIsOnlyMeaningfulForPsiphonModes() {
+        val plain = args(VpnSettings(mode = TunnelMode.MASQUE, psiphonRegion = "DE"))
+
+        assertFalse("a WARP exit is whatever edge the scan found", plain.contains("--psiphon-region"))
     }
 
     @Test
-    fun aCountryPolicyAppliesToTorOnlyToo() {
-        val a = args(VpnSettings(mode = TunnelMode.TOR_ONLY, exit = ExitPolicy.Block("IR")))
+    fun noRegionMeansLetPsiphonPick() {
+        val a = args(VpnSettings(mode = TunnelMode.GOOL_PSIPHON, psiphonRegion = null))
 
-        assertEquals("!IR", a.valueOf("--exit-loc"))
+        assertFalse(a.contains("--psiphon-region"))
     }
 
     @Test

@@ -5,7 +5,6 @@ import com.aethershield.core.EngineEndpoint
 import com.aethershield.core.EngineStatus
 import com.aethershield.core.ExitFinder
 import com.aethershield.core.ExitInfo
-import com.aethershield.core.ExitPolicy
 import com.aethershield.core.SocksExitFinder
 import com.aethershield.core.SocksProbe
 import com.aethershield.core.SmartPlan
@@ -85,6 +84,10 @@ class ConnectionManager(
     private val _exit = MutableStateFlow<ExitInfo?>(null)
     val exitInfo: StateFlow<ExitInfo?> = _exit.asStateFlow()
 
+    /** The SOCKS5 port of the running tunnel; null when there is nothing to share. */
+    private val _endpoint = MutableStateFlow<EngineEndpoint?>(null)
+    val activeEndpoint: StateFlow<EngineEndpoint?> = _endpoint.asStateFlow()
+
     /** The protocol actually in use, which only differs from the setting under "Smart". */
     private val _activeMode = MutableStateFlow<TunnelMode?>(null)
     val activeMode: StateFlow<TunnelMode?> = _activeMode.asStateFlow()
@@ -157,11 +160,6 @@ class ConnectionManager(
         // the protocol that was working instead of walking the whole list again.
         var smartIndex = 0
 
-        // A country policy turns each attempt into "refuse this exit, try another gateway",
-        // so it needs more room than a plain connect before giving up.
-        val attemptBudget =
-            if (settings.exit === ExitPolicy.Any) timing.maxAttempts else timing.maxAttempts * 2
-
         while (currentCoroutineContext().isActive) {
             val startedAt = System.currentTimeMillis()
             val mode =
@@ -175,6 +173,7 @@ class ConnectionManager(
                 host.attach(endpoint)
                 failures = 0
                 _activeMode.value = mode
+                _endpoint.value = endpoint
                 _state.value = ConnectionState.Connected(System.currentTimeMillis())
                 monitor(endpoint, host)
                 lastProblem = "the tunnel stopped answering"
@@ -191,7 +190,7 @@ class ConnectionManager(
             // for a while earns a fresh budget of attempts.
             if (System.currentTimeMillis() - startedAt >= timing.healthySessionMs) failures = 0
             failures++
-            if (failures > attemptBudget) {
+            if (failures > timing.maxAttempts) {
                 fail(host, lastProblem)
                 return
             }
@@ -281,6 +280,7 @@ class ConnectionManager(
         _traffic.value = TrafficSnapshot()
         _exit.value = null
         _activeMode.value = null
+        _endpoint.value = null
     }
 
     private suspend fun safeStop() {

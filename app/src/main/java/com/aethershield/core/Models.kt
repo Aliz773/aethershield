@@ -72,6 +72,13 @@ val TunnelMode.needsPsiphonBinary: Boolean
     get() = layer == Layer.PSIPHON
 
 /**
+ * Only a Psiphon exit has selectable countries: `--psiphon-region` asks Psiphon for an egress
+ * region, while a plain WARP exit is whatever edge the scan lands on -- there is nothing to ask.
+ */
+val TunnelMode.hasSelectableCountry: Boolean
+    get() = layer == Layer.PSIPHON
+
+/**
  * What "Smart" tries, in order. It walks down the list until one protocol connects and then
  * sticks with that one for the rest of the session, so a reconnect does not start over.
  */
@@ -122,59 +129,29 @@ enum class IpVersion(val flag: String) {
     DUAL("--dual"),
 }
 
-/**
- * `--exit-loc`: the core refuses a tunnel whose exit country is not acceptable, checked
- * through the finished tunnel before it exposes SOCKS5 and again every minute after.
- *
- * This is a filter, not a picker -- the core does not ask for a country, it rejects what it
- * got. Turning it into "connect to Germany" is the app's job: the connection manager keeps
- * retrying until an acceptable exit comes up.
- */
-sealed interface ExitPolicy {
-    data object Any : ExitPolicy
-
-    /** `!IR` -- any exit except these. */
-    data class Block(val countryCode: String) : ExitPolicy
-
-    /** `DE` -- only these. */
-    data class Only(val countryCode: String) : ExitPolicy
-
-    /** The `--exit-loc` argument, or null when the flag should not be passed at all. */
-    val cliSpec: String?
-        get() = when (this) {
-            Any -> null
-            is Block -> "!${countryCode.uppercase()}"
-            is Only -> countryCode.uppercase()
-        }
-}
-
-internal fun ExitPolicy.encodeForStorage(): String = when (this) {
-    ExitPolicy.Any -> "any"
-    is ExitPolicy.Block -> "block:${countryCode.uppercase()}"
-    is ExitPolicy.Only -> "only:${countryCode.uppercase()}"
-}
-
-internal fun decodeExitPolicy(raw: String?): ExitPolicy {
-    val parts = raw?.split(':', limit = 2) ?: return ExitPolicy.Any
-    val code = parts.getOrNull(1)?.takeIf { it.length == 2 } ?: return ExitPolicy.Any
-    return when (parts[0]) {
-        "block" -> ExitPolicy.Block(code.uppercase())
-        "only" -> ExitPolicy.Only(code.uppercase())
-        else -> ExitPolicy.Any
-    }
-}
-
 data class VpnSettings(
     val mode: TunnelMode = TunnelMode.MASQUE,
     val transport: Transport = Transport.HTTP3_QUIC,
     val scan: ScanMode = ScanMode.TURBO,
     val noize: NoizeProfile = NoizeProfile.AUTO,
     val ip: IpVersion = IpVersion.IPV4,
-    val exit: ExitPolicy = ExitPolicy.Any,
+    /** ISO-3166 alpha-2 egress region for `--psiphon-region`, or null for "let Psiphon pick". */
+    val psiphonRegion: String? = null,
 ) {
     /** Returns an error message, or null when the combination is valid. */
     fun validate(): String? =
         if (transport == Transport.HTTP2_TCP && !mode.usesMasque)
             "HTTP/2 transport is only valid for MASQUE-based modes"
         else null
+}
+
+/**
+ * ISO-3166 alpha-2 → regional indicator letters, which render as the country's flag.
+ * Anything that is not two ASCII letters comes back untouched, so a bad value can never
+ * print control characters.
+ */
+fun flagEmoji(countryCode: String): String {
+    val code = countryCode.uppercase()
+    if (code.length != 2 || code.any { it !in 'A'..'Z' }) return ""
+    return code.map { Character.toChars(0x1F1E6 + (it - 'A')).concatToString() }.joinToString("")
 }

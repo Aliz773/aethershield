@@ -62,7 +62,7 @@ fun AetherShieldApp() {
         Box(Modifier.padding(pad)) {
             when (tab) {
                 0 -> HomeScreen()
-                1 -> PlaceholderScreen(R.string.nav_sharing, R.string.todo_sharing)
+                1 -> SharingScreen()
                 2 -> DiagnosticsScreen()
                 3 -> SettingsScreen()
                 else -> AboutScreen()
