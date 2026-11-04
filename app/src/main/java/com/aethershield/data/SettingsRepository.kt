@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.aethershield.core.IpVersion
 import com.aethershield.core.NoizeProfile
 import com.aethershield.core.ScanMode
+import com.aethershield.core.ThemeMode
 import com.aethershield.core.Transport
 import com.aethershield.core.TunnelMode
 import com.aethershield.core.VpnSettings
@@ -23,6 +24,12 @@ class SettingsRepository(private val context: Context) {
     private val noizeKey = stringPreferencesKey("noize")
     private val ipKey = stringPreferencesKey("ip")
     private val regionKey = stringPreferencesKey("psiphon_region")
+    private val themeKey = stringPreferencesKey("theme")
+
+    /** Follows the phone unless the user picked one of the three explicit looks. */
+    val themeMode: Flow<ThemeMode> = context.dataStore.data.map {
+        it[themeKey].toEnumOr(ThemeMode.SYSTEM)
+    }
 
     val settings: Flow<VpnSettings> = context.dataStore.data.map { p ->
         VpnSettings(
@@ -64,6 +71,10 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit {
             if (region == null) it.remove(regionKey) else it[regionKey] = region.uppercase()
         }
+    }
+
+    suspend fun setTheme(mode: ThemeMode) {
+        context.dataStore.edit { it[themeKey] = mode.name }
     }
 
     /** A stored value can be stale (an enum renamed between versions); fall back quietly. */

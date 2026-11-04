@@ -18,20 +18,26 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.aethershield.AppContainer
 import com.aethershield.R
+import com.aethershield.core.ThemeMode
 import com.aethershield.ui.theme.AetherShieldTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { AetherShieldTheme { AetherShieldApp() } }
+        setContent {
+            val theme by AppContainer.settings.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
+            AetherShieldTheme(theme) { AetherShieldApp() }
+        }
     }
 }
 

@@ -36,6 +36,15 @@
     <string name="mode_tor">Tor only</string>
     <string name="transport_h3">HTTP/3 (QUIC)</string>
     <string name="transport_h2">HTTP/2 (TCP)</string>
+    <string name="home_tap_to_connect">Tap the circle to connect</string>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_advanced_hint">Only change these when the default does not get through.</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_hint">Following the phone is the default: the app is light when the phone is light, and dark when it is dark.</string>
+    <string name="theme_system">Follow the phone</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_amoled">Pure black (AMOLED)</string>
     <string name="settings_scan">Scan mode</string>
     <string name="settings_scan_hint">How hard the core searches for a working gateway before it connects.</string>
     <string name="scan_turbo">Turbo — first gateway that answers</string>

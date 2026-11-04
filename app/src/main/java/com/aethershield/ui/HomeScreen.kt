@@ -191,6 +191,13 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
             )
         }
         Text(stringResource(s.labelRes()), fontSize = 22.sp, fontWeight = FontWeight.Medium)
+        if (s.isIdle) {
+            Text(
+                stringResource(R.string.home_tap_to_connect),
+                fontSize = 13.sp,
+                color = scheme.onSurfaceVariant,
+            )
+        }
 
         if (s is ConnectionState.Connected) {
             val elapsed by produceState(0L, s) {
@@ -219,10 +226,6 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
                     stringResource(settings.mode.labelRes())
                 }
                 ConfigRow(stringResource(R.string.cfg_mode), modeText)
-                ConfigRow(
-                    stringResource(R.string.cfg_transport),
-                    if (settings.mode.mayUseMasque) stringResource(settings.transport.labelRes()) else PLACEHOLDER,
-                )
                 if (settings.mode.hasSelectableCountry) {
                     Row(
                         Modifier.fillMaxWidth()

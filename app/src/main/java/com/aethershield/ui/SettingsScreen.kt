@@ -18,6 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -35,6 +38,7 @@ import com.aethershield.R
 import com.aethershield.core.IpVersion
 import com.aethershield.core.NoizeProfile
 import com.aethershield.core.ScanMode
+import com.aethershield.core.ThemeMode
 import com.aethershield.core.VpnSettings
 import com.aethershield.core.isIdle
 import com.aethershield.data.SettingsRepository
@@ -47,15 +51,27 @@ class SettingsViewModel(private val repo: SettingsRepository) : ViewModel() {
     val settings: StateFlow<VpnSettings> =
         repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, VpnSettings())
 
+    val themeMode: StateFlow<ThemeMode> =
+        repo.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
+
     fun setScan(value: ScanMode) { viewModelScope.launch { repo.setScan(value) } }
     fun setNoize(value: NoizeProfile) { viewModelScope.launch { repo.setNoize(value) } }
     fun setIpVersion(value: IpVersion) { viewModelScope.launch { repo.setIpVersion(value) } }
+    fun setTheme(value: ThemeMode) { viewModelScope.launch { repo.setTheme(value) } }
 
     companion object {
         val Factory = viewModelFactory {
             initializer { SettingsViewModel(AppContainer.settings) }
         }
     }
+}
+
+@StringRes
+private fun ThemeMode.labelRes(): Int = when (this) {
+    ThemeMode.SYSTEM -> R.string.theme_system
+    ThemeMode.LIGHT -> R.string.theme_light
+    ThemeMode.DARK -> R.string.theme_dark
+    ThemeMode.AMOLED -> R.string.theme_amoled
 }
 
 @StringRes
@@ -95,9 +111,11 @@ private fun IpVersion.labelRes(): Int = when (this) {
 @Composable
 fun SettingsScreen(vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
     val settings by vm.settings.collectAsState()
+    val theme by vm.themeMode.collectAsState()
     val state by AppContainer.connection.state.collectAsState()
     val locked = !state.isIdle
     val scheme = MaterialTheme.colorScheme
+    var advancedOpen by rememberSaveable { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -109,34 +127,84 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel(factory = SettingsViewModel
         }
 
         ChoiceCard(
-            title = stringResource(R.string.settings_scan),
-            hint = stringResource(R.string.settings_scan_hint),
-            options = ScanMode.entries,
-            selected = settings.scan,
-            enabled = !locked,
+            title = stringResource(R.string.settings_theme),
+            hint = stringResource(R.string.settings_theme_hint),
+            options = ThemeMode.entries,
+            selected = theme,
+            enabled = true,
             label = { stringResource(it.labelRes()) },
-            onSelect = vm::setScan,
+            onSelect = vm::setTheme,
         )
 
-        ChoiceCard(
-            title = stringResource(R.string.settings_noize),
-            hint = stringResource(R.string.settings_noize_hint),
-            options = NoizeProfile.entries,
-            selected = settings.noize,
-            enabled = !locked,
-            label = { stringResource(it.labelRes()) },
-            onSelect = vm::setNoize,
-        )
+        AdvancedSection(
+            open = advancedOpen,
+            onToggle = { advancedOpen = !advancedOpen },
+        ) {
+            ChoiceCard(
+                title = stringResource(R.string.settings_scan),
+                hint = stringResource(R.string.settings_scan_hint),
+                options = ScanMode.entries,
+                selected = settings.scan,
+                enabled = !locked,
+                label = { stringResource(it.labelRes()) },
+                onSelect = vm::setScan,
+            )
 
-        ChoiceCard(
-            title = stringResource(R.string.settings_ip),
-            hint = stringResource(R.string.settings_ip_hint),
-            options = IpVersion.entries,
-            selected = settings.ip,
-            enabled = !locked,
-            label = { stringResource(it.labelRes()) },
-            onSelect = vm::setIpVersion,
-        )
+            ChoiceCard(
+                title = stringResource(R.string.settings_noize),
+                hint = stringResource(R.string.settings_noize_hint),
+                options = NoizeProfile.entries,
+                selected = settings.noize,
+                enabled = !locked,
+                label = { stringResource(it.labelRes()) },
+                onSelect = vm::setNoize,
+            )
+
+            ChoiceCard(
+                title = stringResource(R.string.settings_ip),
+                hint = stringResource(R.string.settings_ip_hint),
+                options = IpVersion.entries,
+                selected = settings.ip,
+                enabled = !locked,
+                label = { stringResource(it.labelRes()) },
+                onSelect = vm::setIpVersion,
+            )
+        }
+    }
+}
+
+/** Collapsed by default: a normal user never needs to open it. */
+@Composable
+private fun AdvancedSection(
+    open: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Card(
+            Modifier.fillMaxWidth().clickable(onClick = onToggle),
+            colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainer),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_advanced),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        stringResource(R.string.settings_advanced_hint),
+                        fontSize = 12.sp,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+                Text(if (open) "\u25B4" else "\u25BE", color = scheme.onSurfaceVariant)
+            }
+        }
+        if (open) content()
     }
 }
 

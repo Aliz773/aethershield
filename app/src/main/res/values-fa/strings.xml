@@ -36,6 +36,15 @@
     <string name="mode_tor">فقط تور</string>
     <string name="transport_h3">HTTP/3 (QUIC)</string>
     <string name="transport_h2">HTTP/2 (TCP)</string>
+    <string name="home_tap_to_connect">برای اتصال دایره را لمس کن</string>
+    <string name="settings_advanced">پیشرفته</string>
+    <string name="settings_advanced_hint">فقط وقتی حالت پیش‌فرض جواب نداد این‌ها را عوض کن.</string>
+    <string name="settings_theme">تم</string>
+    <string name="settings_theme_hint">پیش‌فرض «هماهنگ با گوشی» است: اگر گوشی روشن باشد اپ روشن، اگر تیره باشد تیره.</string>
+    <string name="theme_system">هماهنگ با گوشی</string>
+    <string name="theme_light">روشن</string>
+    <string name="theme_dark">تیره</string>
+    <string name="theme_amoled">مشکی مطلق (AMOLED)</string>
     <string name="settings_scan">حالت اسکن</string>
     <string name="settings_scan_hint">هسته چقدر تلاش کند تا یک گیت‌وی سالم پیدا کند.</string>
     <string name="scan_turbo">توربو — اولین گیت‌ویی که جواب بدهد</string>
