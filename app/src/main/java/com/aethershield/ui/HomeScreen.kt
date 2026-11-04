@@ -62,6 +62,7 @@ import com.aethershield.core.Transport
 import com.aethershield.core.TunnelMode
 import com.aethershield.core.VpnSettings
 import com.aethershield.core.isIdle
+import com.aethershield.core.mayUseMasque
 import com.aethershield.core.labelRes
 import com.aethershield.data.SettingsRepository
 import com.aethershield.vpn.ConnectionManager
@@ -84,6 +85,7 @@ class HomeViewModel(
     val state: StateFlow<ConnectionState> = manager.state
     val traffic: StateFlow<TrafficSnapshot> = manager.traffic
     val exitInfo: StateFlow<ExitInfo?> = manager.exitInfo
+    val activeMode: StateFlow<TunnelMode?> = manager.activeMode
     val settings: StateFlow<VpnSettings> =
         repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, VpnSettings())
 
@@ -99,11 +101,18 @@ class HomeViewModel(
 
 @StringRes
 private fun TunnelMode.labelRes(): Int = when (this) {
+    TunnelMode.SMART -> R.string.mode_smart
     TunnelMode.MASQUE -> R.string.mode_masque
-    TunnelMode.WARP_WIREGUARD -> R.string.mode_wg
+    TunnelMode.WIREGUARD -> R.string.mode_wg
     TunnelMode.GOOL -> R.string.mode_gool
-    TunnelMode.GOOL_CLASSIC -> R.string.mode_gool_classic
     TunnelMode.MIM -> R.string.mode_mim
+    TunnelMode.WIREGUARD_PSIPHON -> R.string.mode_wg_psiphon
+    TunnelMode.GOOL_PSIPHON -> R.string.mode_gool_psiphon
+    TunnelMode.MASQUE_PSIPHON -> R.string.mode_masque_psiphon
+    TunnelMode.WIREGUARD_TOR -> R.string.mode_wg_tor
+    TunnelMode.GOOL_TOR -> R.string.mode_gool_tor
+    TunnelMode.MASQUE_TOR -> R.string.mode_masque_tor
+    TunnelMode.GOOL_CLASSIC -> R.string.mode_gool_classic
     TunnelMode.TOR_ONLY -> R.string.mode_tor
 }
 
@@ -141,6 +150,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
     val state by vm.state.collectAsState()
     val traffic by vm.traffic.collectAsState()
     val exit by vm.exitInfo.collectAsState()
+    val activeMode by vm.activeMode.collectAsState()
     val settings by vm.settings.collectAsState()
     var showSheet by remember { mutableStateOf(false) }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -212,10 +222,16 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.cfg_title), fontWeight = FontWeight.SemiBold)
-                ConfigRow(stringResource(R.string.cfg_mode), stringResource(settings.mode.labelRes()))
+                val active = activeMode
+                val modeText = if (settings.mode == TunnelMode.SMART && active != null) {
+                    stringResource(R.string.mode_smart) + " · " + stringResource(active.labelRes())
+                } else {
+                    stringResource(settings.mode.labelRes())
+                }
+                ConfigRow(stringResource(R.string.cfg_mode), modeText)
                 ConfigRow(
                     stringResource(R.string.cfg_transport),
-                    if (settings.mode.usesMasque) stringResource(settings.transport.labelRes()) else PLACEHOLDER,
+                    if (settings.mode.mayUseMasque) stringResource(settings.transport.labelRes()) else PLACEHOLDER,
                 )
                 Text(stringResource(R.string.cfg_tap_to_change), fontSize = 12.sp, color = scheme.onSurfaceVariant)
             }
@@ -249,7 +265,11 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
             containerColor = scheme.surfaceContainer,
         ) {
             Column(
-                Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).navigationBarsPadding(),
+                Modifier
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 24.dp)
+                    .navigationBarsPadding()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(stringResource(R.string.cfg_mode), fontWeight = FontWeight.SemiBold)
@@ -270,11 +290,11 @@ fun HomeScreen(vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
                             selected = settings.transport == t,
                             onClick = { vm.setTransport(t) },
                             label = { Text(stringResource(t.labelRes())) },
-                            enabled = !locked && settings.mode.usesMasque,
+                            enabled = !locked && settings.mode.mayUseMasque,
                         )
                     }
                 }
-                if (!settings.mode.usesMasque) {
+                if (!settings.mode.mayUseMasque) {
                     Text(stringResource(R.string.cfg_transport_na), fontSize = 12.sp, color = scheme.onSurfaceVariant)
                 }
                 if (locked) {

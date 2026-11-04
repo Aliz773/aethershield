@@ -8,10 +8,12 @@ import com.aethershield.core.ExitInfo
 import com.aethershield.core.ExitPolicy
 import com.aethershield.core.SocksExitFinder
 import com.aethershield.core.SocksProbe
+import com.aethershield.core.SmartPlan
 import com.aethershield.core.TrafficMeter
 import com.aethershield.core.TrafficSnapshot
 import com.aethershield.core.TunnelEngine
 import com.aethershield.core.TunnelHost
+import com.aethershield.core.TunnelMode
 import com.aethershield.core.VpnSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -83,6 +85,10 @@ class ConnectionManager(
     private val _exit = MutableStateFlow<ExitInfo?>(null)
     val exitInfo: StateFlow<ExitInfo?> = _exit.asStateFlow()
 
+    /** The protocol actually in use, which only differs from the setting under "Smart". */
+    private val _activeMode = MutableStateFlow<TunnelMode?>(null)
+    val activeMode: StateFlow<TunnelMode?> = _activeMode.asStateFlow()
+
     @Volatile
     private var session: Job? = null
 
@@ -137,14 +143,19 @@ class ConnectionManager(
     }
 
     private suspend fun runSession(settings: VpnSettings, host: TunnelHost) {
-        val problem = settings.validate()
-        if (problem != null) {
+        // "Smart" has no flags of its own; validate the mode it would actually start with.
+        val firstMode =
+            if (settings.mode == TunnelMode.SMART) SmartPlan.modeFor(0) else settings.mode
+        settings.copy(mode = firstMode).validate()?.let { problem ->
             fail(host, problem)
             return
         }
 
         var failures = 0
         var lastProblem = "the tunnel stopped answering"
+        // Advanced only when a protocol fails to come up, so a reconnect after a drop keeps
+        // the protocol that was working instead of walking the whole list again.
+        var smartIndex = 0
 
         // A country policy turns each attempt into "refuse this exit, try another gateway",
         // so it needs more room than a plain connect before giving up.
@@ -153,13 +164,17 @@ class ConnectionManager(
 
         while (currentCoroutineContext().isActive) {
             val startedAt = System.currentTimeMillis()
+            val mode =
+                if (settings.mode == TunnelMode.SMART) SmartPlan.modeFor(smartIndex) else settings.mode
+            val attempt = settings.copy(mode = mode)
             try {
                 resetLiveState()
                 _state.value =
                     if (failures == 0) ConnectionState.Connecting else ConnectionState.Reconnecting
-                val endpoint = engine.start(settings)
+                val endpoint = engine.start(attempt)
                 host.attach(endpoint)
                 failures = 0
+                _activeMode.value = mode
                 _state.value = ConnectionState.Connected(System.currentTimeMillis())
                 monitor(endpoint, host)
                 lastProblem = "the tunnel stopped answering"
@@ -167,6 +182,7 @@ class ConnectionManager(
                 throw e
             } catch (e: Exception) {
                 lastProblem = e.message ?: e.javaClass.simpleName
+                if (settings.mode == TunnelMode.SMART) smartIndex++
                 safeStop()
                 host.detach()
             }
@@ -264,6 +280,7 @@ class ConnectionManager(
         meter.reset()
         _traffic.value = TrafficSnapshot()
         _exit.value = null
+        _activeMode.value = null
     }
 
     private suspend fun safeStop() {

@@ -30,9 +30,13 @@ class ConnectionManagerTest {
         var startCount = 0
         var alive = false
         var failure: String? = null
+        var failFor: TunnelMode? = null
+        var lastMode: TunnelMode? = null
 
         override suspend fun start(settings: VpnSettings): EngineEndpoint {
             startCount++
+            lastMode = settings.mode
+            if (settings.mode == failFor) throw EngineUnavailableException("blocked")
             failure?.let { throw EngineUnavailableException(it) }
             alive = true
             return EngineEndpoint("127.0.0.1", 18_000 + startCount)
@@ -212,7 +216,7 @@ class ConnectionManagerTest {
         val manager = ConnectionManager(engine, timing(), probe = { true })
 
         val broken = VpnSettings(
-            mode = TunnelMode.WARP_WIREGUARD,
+            mode = TunnelMode.WIREGUARD,
             transport = Transport.HTTP2_TCP,
         )
         runBlocking { manager.connect(broken, host).join() }
@@ -271,5 +275,22 @@ class ConnectionManagerTest {
 
         manager.stopNow(host)
         assertNull("a stale exit must not outlive the tunnel", manager.exitInfo.value)
+    }
+
+    @Test
+    fun smartWalksToTheNextProtocolWhenTheFirstCannotStart() {
+        val engine = FakeEngine().apply { failFor = TunnelMode.MASQUE }
+        val host = FakeHost()
+        val manager = ConnectionManager(engine, timing(), probe = { true })
+
+        manager.connect(VpnSettings(mode = TunnelMode.SMART), host)
+        waitUntil("connected on a fallback protocol") { manager.state.value is ConnectionState.Connected }
+
+        assertEquals("MASQUE failed, so WireGuard must have been tried", TunnelMode.WIREGUARD, engine.lastMode)
+        assertEquals(TunnelMode.WIREGUARD, manager.activeMode.value)
+        assertEquals(2, engine.startCount)
+
+        manager.stopNow(host)
+        assertNull("no protocol is active once disconnected", manager.activeMode.value)
     }
 }

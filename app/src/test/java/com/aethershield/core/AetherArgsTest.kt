@@ -11,8 +11,12 @@ import org.junit.Test
  */
 class AetherArgsTest {
 
-    private fun args(settings: VpnSettings, port: Int = 19_000): List<String> =
-        AetherArgs.build(settings, port)
+    private fun args(
+        settings: VpnSettings,
+        port: Int = 19_000,
+        layerPort: Int = 19_001,
+        psiphon: String? = null,
+    ): List<String> = AetherArgs.build(settings, port, layerPort, psiphon)
 
     private fun List<String>.valueOf(flag: String): String {
         val i = indexOf(flag)
@@ -31,6 +35,7 @@ class AetherArgsTest {
         assertTrue(a.contains("--quick-reconnect"))
         assertEquals("127.0.0.1:19000", a.valueOf("--bind"))
         assertFalse("obfuscation is left to the core unless asked", a.contains("--noize"))
+        assertFalse("no layer, no second listener", a.contains("--tor-bind"))
     }
 
     @Test
@@ -57,7 +62,7 @@ class AetherArgsTest {
 
     @Test
     fun wireGuardModesDoNotGetAMasqueTransportFlag() {
-        val a = args(VpnSettings(mode = TunnelMode.WARP_WIREGUARD))
+        val a = args(VpnSettings(mode = TunnelMode.WIREGUARD))
 
         assertTrue(a.contains("--wg"))
         assertFalse(a.contains("--h2"))
@@ -125,5 +130,44 @@ class AetherArgsTest {
         val a = args(VpnSettings(mode = TunnelMode.TOR_ONLY, exit = ExitPolicy.Block("IR")))
 
         assertEquals("!IR", a.valueOf("--exit-loc"))
+    }
+
+    @Test
+    fun everyModeExceptSmartProducesAFullCommandLine() {
+        TunnelMode.entries.filter { it != TunnelMode.SMART }.forEach { mode ->
+            val a = args(VpnSettings(mode = mode), psiphon = "/x/libpsiphon-tunnel-core.so")
+            assertTrue("$mode must name its protocol", a.any { it.startsWith("--") })
+            assertEquals("$mode must bind a proxy", "127.0.0.1:19000", a.valueOf("--bind"))
+        }
+    }
+
+    @Test
+    fun aTorLayerGetsItsOwnListenerPort() {
+        val a = args(VpnSettings(mode = TunnelMode.MASQUE_TOR))
+
+        assertTrue(a.contains("--masque"))
+        assertTrue(a.contains("--tor"))
+        assertFalse("the reverse variant would send traffic the other way",
+            a.contains("--tor-reverse"))
+        assertEquals("the layered exit must be named, not guessed",
+            "127.0.0.1:19001", a.valueOf("--tor-bind"))
+    }
+
+    @Test
+    fun aPsiphonLayerGetsItsBinaryAndItsPort() {
+        val a = args(
+            VpnSettings(mode = TunnelMode.GOOL_PSIPHON),
+            psiphon = "/data/app/libpsiphon-tunnel-core.so",
+        )
+
+        assertTrue(a.contains("--gool"))
+        assertTrue(a.contains("--psiphon"))
+        assertEquals("127.0.0.1:19001", a.valueOf("--psiphon-bind"))
+        assertEquals("/data/app/libpsiphon-tunnel-core.so", a.valueOf("--psiphon-bin"))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun smartMustBeResolvedBeforeBuildingArgs() {
+        AetherArgs.build(VpnSettings(mode = TunnelMode.SMART), 19_000)
     }
 }

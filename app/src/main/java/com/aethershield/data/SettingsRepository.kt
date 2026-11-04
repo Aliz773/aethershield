@@ -9,6 +9,7 @@ import com.aethershield.core.NoizeProfile
 import com.aethershield.core.ScanMode
 import com.aethershield.core.Transport
 import com.aethershield.core.TunnelMode
+import com.aethershield.core.mayUseMasque
 import com.aethershield.core.VpnSettings
 import com.aethershield.core.decodeExitPolicy
 import com.aethershield.core.encodeForStorage
@@ -41,7 +42,7 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit {
             it[modeKey] = mode.name
             // Transport only matters for MASQUE-based modes; keep the stored value valid.
-            if (!mode.usesMasque) it[transportKey] = Transport.HTTP3_QUIC.name
+            if (!mode.mayUseMasque) it[transportKey] = Transport.HTTP3_QUIC.name
         }
     }
 

@@ -14,28 +14,76 @@ val ConnectionState.isIdle: Boolean
     get() = this is ConnectionState.Disconnected || this is ConnectionState.Error
 
 /**
- * Every protocol the shipped v2.4.0 binary offers.
+ * An extra hop carried by the WARP tunnel (`--tor` / `--psiphon`).
  *
- * The interactive menu of the core lists four (MASQUE, WireGuard, gool, MASQUE-in-MASQUE);
- * `--gool-classic` is its older flavour of gool, and `--tor-only` is the one entry that is
- * not a WARP tunnel at all. All flags verified against the binary's own `--help`.
+ * The core does not move the exit when one of these is on: it keeps the WARP exit on `--bind`
+ * and opens a *second* SOCKS listener on [bindFlag] that comes out of tor/psiphon. Routing the
+ * device through that layer therefore means pointing the TUN at that second port, which is what
+ * the engine does.
+ */
+enum class Layer(val flag: String?, val bindFlag: String?) {
+    NONE(null, null),
+    TOR("--tor", "--tor-bind"),
+    PSIPHON("--psiphon", "--psiphon-bind"),
+}
+
+/**
+ * Every mode the shipped v2.4.0 binary can actually run, named the way the other Aether GUIs
+ * name them: a protocol (MASQUE / WireGuard / gool / MIM) optionally carrying tor or psiphon.
  *
- * Psiphon is deliberately absent: it shells out to a separate `psiphon-tunnel-core` binary
- * ("when it is not next to aether, in ./pt, or on PATH") which is not part of this APK, so a
- * mode for it would only ever fail. Tor, by contrast, is linked into the binary.
+ * [SMART] is not a flag set: it walks [SmartPlan.order] until something connects.
+ * All the other flags are taken from the binary's own `--help`.
  */
 enum class TunnelMode(
-    val cliFlag: String,
+    val cliFlags: List<String>,
     val usesMasque: Boolean,
-    /** False for tor-only: there is no WARP tunnel to scan for, only a local tor proxy. */
+    val layer: Layer = Layer.NONE,
+    /** False for smart and tor-only: there is no WARP tunnel to scan for. */
     val isTunnel: Boolean = true,
 ) {
-    MASQUE("--masque", true),
-    WARP_WIREGUARD("--wg", false),
-    GOOL("--gool", true),
-    GOOL_CLASSIC("--gool-classic", false),
-    MIM("--mim", true),
-    TOR_ONLY("--tor-only", false, isTunnel = false),
+    SMART(emptyList(), usesMasque = false, isTunnel = false),
+    MASQUE(listOf("--masque"), usesMasque = true),
+    WIREGUARD(listOf("--wg"), usesMasque = false),
+    GOOL(listOf("--gool"), usesMasque = true),
+    MIM(listOf("--mim"), usesMasque = true),
+    WIREGUARD_PSIPHON(listOf("--wg", "--psiphon"), usesMasque = false, layer = Layer.PSIPHON),
+    GOOL_PSIPHON(listOf("--gool", "--psiphon"), usesMasque = true, layer = Layer.PSIPHON),
+    MASQUE_PSIPHON(listOf("--masque", "--psiphon"), usesMasque = true, layer = Layer.PSIPHON),
+    WIREGUARD_TOR(listOf("--wg", "--tor"), usesMasque = false, layer = Layer.TOR),
+    GOOL_TOR(listOf("--gool", "--tor"), usesMasque = true, layer = Layer.TOR),
+    MASQUE_TOR(listOf("--masque", "--tor"), usesMasque = true, layer = Layer.TOR),
+    GOOL_CLASSIC(listOf("--gool-classic"), usesMasque = false),
+    TOR_ONLY(listOf("--tor-only"), usesMasque = false, isTunnel = false),
+}
+
+/** Tor needs minutes to bootstrap, whether it is the whole tunnel or a layer inside one. */
+val TunnelMode.slowStart: Boolean
+    get() = this == TunnelMode.TOR_ONLY || layer == Layer.TOR
+
+/**
+ * Whether the HTTP/2-vs-HTTP/3 choice is meaningful. Smart is included because it may land on
+ * MASQUE, and disabling the chips for it would take the choice away for no reason.
+ */
+val TunnelMode.mayUseMasque: Boolean
+    get() = usesMasque || this == TunnelMode.SMART
+
+/** Psiphon shells out to a binary this app does not ship; the engine fails fast and says so. */
+val TunnelMode.needsPsiphonBinary: Boolean
+    get() = layer == Layer.PSIPHON
+
+/**
+ * What "Smart" tries, in order. It walks down the list until one protocol connects and then
+ * sticks with that one for the rest of the session, so a reconnect does not start over.
+ */
+object SmartPlan {
+    val order: List<TunnelMode> = listOf(
+        TunnelMode.MASQUE,
+        TunnelMode.WIREGUARD,
+        TunnelMode.GOOL,
+        TunnelMode.MIM,
+    )
+
+    fun modeFor(attempt: Int): TunnelMode = order[attempt % order.size]
 }
 
 enum class Transport { HTTP3_QUIC, HTTP2_TCP }
@@ -79,8 +127,8 @@ enum class IpVersion(val flag: String) {
  * through the finished tunnel before it exposes SOCKS5 and again every minute after.
  *
  * This is a filter, not a picker -- the core does not ask for a country, it rejects what it
- * got. Turning it into "connect to Germany" is the app's job: [com.aethershield.vpn.ConnectionManager]
- * keeps retrying until an acceptable exit comes up.
+ * got. Turning it into "connect to Germany" is the app's job: the connection manager keeps
+ * retrying until an acceptable exit comes up.
  */
 sealed interface ExitPolicy {
     data object Any : ExitPolicy

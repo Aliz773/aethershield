@@ -78,10 +78,17 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         }
         synchronized(logLock) { tail.clear() }
 
-        val port = freeLoopbackPort()
-        val target = EngineEndpoint(AetherArgs.LOOPBACK, port)
+        val psiphonBinary = resolvePsiphon(settings)
 
-        val builder = ProcessBuilder(listOf(exe.absolutePath) + AetherArgs.build(settings, port))
+        // The main listener always keeps the WARP exit; a tor/psiphon layer opens a second
+        // listener, and that second one is what the device has to be routed through.
+        val port = freeLoopbackPort()
+        val layered = settings.mode.layer != Layer.NONE
+        val layerPort = if (layered) freeLoopbackPort(exclude = port) else 0
+        val target = EngineEndpoint(AetherArgs.LOOPBACK, if (layered) layerPort else port)
+
+        val args = AetherArgs.build(settings, port, layerPort, psiphonBinary)
+        val builder = ProcessBuilder(listOf(exe.absolutePath) + args)
             .directory(context.filesDir)
             .redirectErrorStream(true)
         builder.environment()["HOME"] = context.filesDir.absolutePath
@@ -96,9 +103,25 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         pumpLogs(p)
 
         // Bootstrapping tor is measured in minutes on a filtered network, not seconds.
-        val timeout = if (settings.mode == TunnelMode.TOR_ONLY) TOR_TIMEOUT_MS else START_TIMEOUT_MS
+        val timeout = if (settings.mode.slowStart) TOR_TIMEOUT_MS else START_TIMEOUT_MS
         awaitReady(p, target, timeout)
         target
+    }
+
+    /**
+     * `psiphon-tunnel-core` is a separate Go executable. This build does not ship it, so a
+     * psiphon mode fails immediately with a sentence that says so, instead of scanning for a
+     * gateway for a minute and then reporting something unrelated.
+     */
+    private fun resolvePsiphon(settings: VpnSettings): String? {
+        if (!settings.mode.needsPsiphonBinary) return null
+        val binary = File(context.applicationInfo.nativeLibraryDir, PSIPHON_BINARY)
+        if (!binary.exists()) {
+            throw EngineUnavailableException(
+                "$PSIPHON_BINARY is not bundled with this build (looked in ${binary.parent})"
+            )
+        }
+        return binary.absolutePath
     }
 
     override suspend fun stop() = withContext(Dispatchers.IO) { stopInternal(graceful = true) }
@@ -161,8 +184,14 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         }, "aether-log").apply { isDaemon = true }.start()
     }
 
-    private fun freeLoopbackPort(): Int =
-        ServerSocket(0, 1, InetAddress.getByName(AetherArgs.LOOPBACK)).use { it.localPort }
+    private fun freeLoopbackPort(exclude: Int? = null): Int {
+        val address = InetAddress.getByName(AetherArgs.LOOPBACK)
+        repeat(8) {
+            val candidate = ServerSocket(0, 1, address).use { it.localPort }
+            if (candidate != exclude) return candidate
+        }
+        throw EngineUnavailableException("could not reserve two distinct loopback ports")
+    }
 
     private fun lastLines(): String =
         synchronized(logLock) { tail.takeLast(5).joinToString(" | ") }.ifBlank { "(no output)" }
@@ -170,6 +199,7 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
     companion object {
         /** Must match the binary in jniLibs/arm64-v8a/. */
         const val BINARY_NAME = "libaether_cli.so"
+        const val PSIPHON_BINARY = "libpsiphon-tunnel-core.so"
         const val CORE_VERSION = "2.4.0"
 
         private const val TAG = "AetherCore"
