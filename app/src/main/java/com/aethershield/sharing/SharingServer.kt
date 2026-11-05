@@ -60,45 +60,76 @@ class SharingServer(private val upstream: () -> EngineEndpoint?) {
     val state: StateFlow<SharingState> = _state.asStateFlow()
 
     @Volatile
-    private var server: ServerSocket? = null
+    private var httpServer: ServerSocket? = null
 
     @Volatile
-    private var boundPort = SharingState.DEFAULT_PORT
+    private var socksServer: ServerSocket? = null
+
+    @Volatile
+    private var boundHttp = SharingState.DEFAULT_HTTP_PORT
+
+    @Volatile
+    private var boundSocks = SharingState.DEFAULT_SOCKS_PORT
 
     /** Live view for the UI; byte counters are read from the sessions as they stand. */
     fun snapshot(): SharingState = _state.value.copy(
         clients = sessions.values.map { it.toClient() }.sortedBy { it.sinceMillis },
     )
 
+    /**
+     * Binds both documented ports. Each one speaks exactly the protocol it is named after,
+     * so a guest that types 8080 into an HTTP proxy field always gets HTTP.
+     */
     @Synchronized
-    fun start(port: Int = SharingState.DEFAULT_PORT): Boolean {
-        if (server != null) return true
+    fun start(
+        httpPort: Int = SharingState.DEFAULT_HTTP_PORT,
+        socksPort: Int = SharingState.DEFAULT_SOCKS_PORT,
+    ): Boolean {
+        if (httpServer != null || socksServer != null) return true
         return try {
-            val socket = ServerSocket().apply {
-                reuseAddress = true
-                bind(InetSocketAddress("0.0.0.0", port))
+            val http = bind(httpPort)
+            val socks = try {
+                bind(socksPort)
+            } catch (e: IOException) {
+                runCatching { http.close() }
+                throw e
             }
-            server = socket
-            boundPort = socket.localPort
-            acceptLoop(socket)
-            _state.value = SharingState(running = true, port = boundPort)
+            httpServer = http
+            socksServer = socks
+            boundHttp = http.localPort
+            boundSocks = socks.localPort
+            acceptLoop(http, "HTTP")
+            acceptLoop(socks, "SOCKS5")
+            _state.value = SharingState(running = true, httpPort = boundHttp, socksPort = boundSocks)
             true
         } catch (e: IOException) {
-            _state.value = SharingState(running = false, port = port, error = e.message)
+            _state.value = SharingState(
+                running = false,
+                httpPort = httpPort,
+                socksPort = socksPort,
+                error = e.message,
+            )
             false
         }
     }
 
-    @Synchronized
-    fun stop() {
-        runCatching { server?.close() }
-        server = null
-        sessions.values.forEach { runCatching { it.socket.close() } }
-        sessions.clear()
-        _state.value = SharingState(running = false, port = boundPort)
+    private fun bind(port: Int): ServerSocket = ServerSocket().apply {
+        reuseAddress = true
+        bind(InetSocketAddress("0.0.0.0", port))
     }
 
-    private fun acceptLoop(socket: ServerSocket) {
+    @Synchronized
+    fun stop() {
+        runCatching { httpServer?.close() }
+        runCatching { socksServer?.close() }
+        httpServer = null
+        socksServer = null
+        sessions.values.forEach { runCatching { it.socket.close() } }
+        sessions.clear()
+        _state.value = SharingState(running = false, httpPort = boundHttp, socksPort = boundSocks)
+    }
+
+    private fun acceptLoop(socket: ServerSocket, protocol: String) {
         Thread({
             while (!socket.isClosed) {
                 val client = try {
@@ -106,12 +137,12 @@ class SharingServer(private val upstream: () -> EngineEndpoint?) {
                 } catch (_: IOException) {
                     break
                 }
-                Thread({ serve(client) }, "share-client").apply { isDaemon = true }.start()
+                Thread({ serve(client, protocol) }, "share-client").apply { isDaemon = true }.start()
             }
         }, "share-accept").apply { isDaemon = true }.start()
     }
 
-    private fun serve(client: Socket) {
+    private fun serve(client: Socket, forced: String?) {
         var session: Session? = null
         try {
             client.soTimeout = HANDSHAKE_TIMEOUT_MS
@@ -123,7 +154,8 @@ class SharingServer(private val upstream: () -> EngineEndpoint?) {
             input.reset()
             if (first < 0) return
 
-            if (first == 0x05) {
+            val socks = forced == "SOCKS5" || forced == null && first == 0x05
+            if (socks) {
                 session = register(client, "SOCKS5", null)
                 serveSocks(client, input, output, session)
             } else {

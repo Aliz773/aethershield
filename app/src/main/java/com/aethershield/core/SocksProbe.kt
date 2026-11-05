@@ -79,6 +79,23 @@ internal object SocksProbe {
         false
     }
 
+    /**
+     * The same CONNECT as [connectsThrough], reported as milliseconds. This is handshake
+     * latency measured through the tunnel -- honest, and the only latency a TCP tunnel can
+     * offer, since ICMP never enters it.
+     */
+    fun connectMillis(
+        host: String,
+        port: Int,
+        targetHost: String,
+        targetPort: Int,
+        timeoutMs: Int = 5_000,
+    ): Int? {
+        val started = System.nanoTime()
+        if (!connectsThrough(host, port, targetHost, targetPort, timeoutMs)) return null
+        return ((System.nanoTime() - started) / 1_000_000).toInt()
+    }
+
     /** [Socket.inputStream].read() is allowed to return short; loop until [size] or EOF. */
     private fun InputStream.readFully(buffer: ByteArray, size: Int): Boolean {
         var read = 0

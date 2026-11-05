@@ -1,31 +1,31 @@
 package com.aethershield.ui
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -39,9 +39,19 @@ import com.aethershield.core.IpVersion
 import com.aethershield.core.NoizeProfile
 import com.aethershield.core.ScanMode
 import com.aethershield.core.ThemeMode
+import com.aethershield.core.Transport
+import com.aethershield.core.TunnelMode
 import com.aethershield.core.VpnSettings
+import com.aethershield.core.hasSelectableCountry
 import com.aethershield.core.isIdle
+import com.aethershield.core.mayUseMasque
 import com.aethershield.data.SettingsRepository
+import com.aethershield.ui.components.AetherCard
+import com.aethershield.ui.components.AetherSectionHeader
+import com.aethershield.ui.components.AetherSettingRow
+import com.aethershield.ui.components.AetherTopBar
+import com.aethershield.ui.theme.AetherText
+import com.aethershield.ui.theme.Space
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -50,207 +60,232 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(private val repo: SettingsRepository) : ViewModel() {
     val settings: StateFlow<VpnSettings> =
         repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, VpnSettings())
-
     val themeMode: StateFlow<ThemeMode> =
         repo.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
 
-    fun setScan(value: ScanMode) { viewModelScope.launch { repo.setScan(value) } }
-    fun setNoize(value: NoizeProfile) { viewModelScope.launch { repo.setNoize(value) } }
-    fun setIpVersion(value: IpVersion) { viewModelScope.launch { repo.setIpVersion(value) } }
-    fun setTheme(value: ThemeMode) { viewModelScope.launch { repo.setTheme(value) } }
+    fun setTheme(v: ThemeMode) { viewModelScope.launch { repo.setTheme(v) } }
+    fun setMode(v: TunnelMode) { viewModelScope.launch { repo.setMode(v) } }
+    fun setTransport(v: Transport) { viewModelScope.launch { repo.setTransport(v) } }
+    fun setScan(v: ScanMode) { viewModelScope.launch { repo.setScan(v) } }
+    fun setNoize(v: NoizeProfile) { viewModelScope.launch { repo.setNoize(v) } }
+    fun setIp(v: IpVersion) { viewModelScope.launch { repo.setIpVersion(v) } }
+    fun setRegion(v: String?) { viewModelScope.launch { repo.setPsiphonRegion(v) } }
 
     companion object {
-        val Factory = viewModelFactory {
-            initializer { SettingsViewModel(AppContainer.settings) }
-        }
+        val Factory = viewModelFactory { initializer { SettingsViewModel(AppContainer.settings) } }
     }
 }
 
-@StringRes
-private fun ThemeMode.labelRes(): Int = when (this) {
-    ThemeMode.SYSTEM -> R.string.theme_system
-    ThemeMode.LIGHT -> R.string.theme_light
-    ThemeMode.DARK -> R.string.theme_dark
-    ThemeMode.AMOLED -> R.string.theme_amoled
-}
-
-@StringRes
-private fun ScanMode.labelRes(): Int = when (this) {
-    ScanMode.TURBO -> R.string.scan_turbo
-    ScanMode.BALANCED -> R.string.scan_balanced
-    ScanMode.THOROUGH -> R.string.scan_thorough
-    ScanMode.VERIFIED -> R.string.scan_verified
-    ScanMode.IRONCLAD -> R.string.scan_ironclad
-}
-
-@StringRes
-private fun NoizeProfile.labelRes(): Int = when (this) {
-    NoizeProfile.AUTO -> R.string.noize_auto
-    NoizeProfile.OFF -> R.string.noize_off
-    NoizeProfile.LIGHT -> R.string.noize_light
-    NoizeProfile.FIREWALL -> R.string.noize_firewall
-    NoizeProfile.BALANCED -> R.string.noize_balanced
-    NoizeProfile.GFW -> R.string.noize_gfw
-    NoizeProfile.AGGRESSIVE -> R.string.noize_aggressive
-}
-
-@StringRes
-private fun IpVersion.labelRes(): Int = when (this) {
-    IpVersion.IPV4 -> R.string.ip_v4
-    IpVersion.IPV6 -> R.string.ip_v6
-    IpVersion.DUAL -> R.string.ip_dual
-}
-
-/**
- * The options here map one-to-one onto real CLI flags of the shipped core, so every change
- * does something. They are locked while a tunnel is up: the core reads its argv once.
- *
- * The exit country is not here on purpose: only Psiphon exposes egress regions, so the picker
- * lives next to the mode it belongs to, in the home configuration panel.
- */
 @Composable
-fun SettingsScreen(vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
+fun SettingsScreen(
+    onOpenSharing: () -> Unit,
+    onOpenLogs: () -> Unit,
+    onOpenAbout: () -> Unit,
+    vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
+) {
     val settings by vm.settings.collectAsState()
     val theme by vm.themeMode.collectAsState()
     val state by AppContainer.connection.state.collectAsState()
-    val locked = !state.isIdle
     val scheme = MaterialTheme.colorScheme
-    var advancedOpen by rememberSaveable { mutableStateOf(false) }
+    val locked = !state.isIdle
+
+    var dialog by remember { mutableStateOf("") }
+    var country by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = Space.screen)
+            .padding(top = 12.dp, bottom = Space.section),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(stringResource(R.string.nav_settings), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-        if (locked) {
-            Text(stringResource(R.string.cfg_locked), fontSize = 12.sp, color = scheme.error)
-        }
-
-        ChoiceCard(
-            title = stringResource(R.string.settings_theme),
-            hint = stringResource(R.string.settings_theme_hint),
-            options = ThemeMode.entries,
-            selected = theme,
-            enabled = true,
-            label = { stringResource(it.labelRes()) },
-            onSelect = vm::setTheme,
+        AetherTopBar(
+            title = stringResource(R.string.nav_settings),
+            subtitle = stringResource(R.string.settings_subtitle),
         )
 
-        AdvancedSection(
-            open = advancedOpen,
-            onToggle = { advancedOpen = !advancedOpen },
-        ) {
-            ChoiceCard(
-                title = stringResource(R.string.settings_scan),
-                hint = stringResource(R.string.settings_scan_hint),
-                options = ScanMode.entries,
-                selected = settings.scan,
-                enabled = !locked,
-                label = { stringResource(it.labelRes()) },
-                onSelect = vm::setScan,
-            )
-
-            ChoiceCard(
-                title = stringResource(R.string.settings_noize),
-                hint = stringResource(R.string.settings_noize_hint),
-                options = NoizeProfile.entries,
-                selected = settings.noize,
-                enabled = !locked,
-                label = { stringResource(it.labelRes()) },
-                onSelect = vm::setNoize,
-            )
-
-            ChoiceCard(
-                title = stringResource(R.string.settings_ip),
-                hint = stringResource(R.string.settings_ip_hint),
-                options = IpVersion.entries,
-                selected = settings.ip,
-                enabled = !locked,
-                label = { stringResource(it.labelRes()) },
-                onSelect = vm::setIpVersion,
+        if (locked) {
+            Text(
+                stringResource(R.string.cfg_locked),
+                style = AetherText.label,
+                color = scheme.error,
+                modifier = Modifier.padding(top = 4.dp, start = 4.dp),
             )
         }
-    }
-}
 
-/** Collapsed by default: a normal user never needs to open it. */
-@Composable
-private fun AdvancedSection(
-    open: Boolean,
-    onToggle: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    val scheme = MaterialTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Card(
-            Modifier.fillMaxWidth().clickable(onClick = onToggle),
-            colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainer),
-        ) {
-            Row(
-                Modifier.fillMaxWidth().padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.settings_advanced),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        stringResource(R.string.settings_advanced_hint),
-                        fontSize = 12.sp,
-                        color = scheme.onSurfaceVariant,
-                    )
-                }
-                Text(if (open) "\u25B4" else "\u25BE", color = scheme.onSurfaceVariant)
+        AetherSectionHeader(stringResource(R.string.settings_appearance))
+        AetherCard(contentPadding = 0.dp) {
+            AetherSettingRow(
+                title = stringResource(R.string.settings_theme),
+                description = stringResource(theme.labelRes()),
+                onClick = { dialog = "theme" },
+            )
+        }
+
+        AetherSectionHeader(stringResource(R.string.settings_connection))
+        AetherCard(contentPadding = 0.dp) {
+            AetherSettingRow(
+                title = stringResource(R.string.cfg_mode),
+                description = stringResource(settings.mode.labelRes()),
+                onClick = { if (!locked) dialog = "mode" },
+            )
+            AetherSettingRow(
+                title = stringResource(R.string.cfg_transport),
+                description = if (settings.mode.mayUseMasque) {
+                    stringResource(settings.transport.labelRes())
+                } else {
+                    stringResource(R.string.cfg_transport_na)
+                },
+                onClick = { if (!locked && settings.mode.mayUseMasque) dialog = "transport" },
+            )
+            AetherSettingRow(
+                title = stringResource(R.string.settings_ip),
+                description = stringResource(settings.ip.labelRes()),
+                onClick = { if (!locked) dialog = "ip" },
+            )
+            if (settings.mode.hasSelectableCountry) {
+                AetherSettingRow(
+                    title = stringResource(R.string.exit_country_title),
+                    description = settings.psiphonRegion?.let { countryLabel(it) }
+                        ?: stringResource(R.string.country_auto),
+                    onClick = { if (!locked) country = true },
+                )
             }
         }
-        if (open) content()
+
+        AetherSectionHeader(stringResource(R.string.settings_advanced))
+        AetherCard(contentPadding = 0.dp) {
+            AetherSettingRow(
+                title = stringResource(R.string.settings_scan),
+                description = stringResource(settings.scan.labelRes()),
+                onClick = { if (!locked) dialog = "scan" },
+            )
+            AetherSettingRow(
+                title = stringResource(R.string.settings_noize),
+                description = stringResource(settings.noize.labelRes()),
+                onClick = { if (!locked) dialog = "noize" },
+            )
+        }
+
+        AetherSectionHeader(stringResource(R.string.settings_more))
+        AetherCard(contentPadding = 0.dp) {
+            AetherSettingRow(
+                title = stringResource(R.string.nav_sharing),
+                description = stringResource(R.string.share_subtitle),
+                onClick = onOpenSharing,
+            )
+            AetherSettingRow(
+                title = stringResource(R.string.settings_diagnostics),
+                description = stringResource(R.string.logs_hint),
+                onClick = onOpenLogs,
+            )
+            AetherSettingRow(
+                title = stringResource(R.string.nav_about),
+                description = stringResource(R.string.about_tagline),
+                onClick = onOpenAbout,
+            )
+        }
+
+        Text(
+            stringResource(R.string.settings_version_footer),
+            style = AetherText.label,
+            color = scheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+        )
+    }
+
+    when (dialog) {
+        "theme" -> ChoiceDialog(
+            title = stringResource(R.string.settings_theme),
+            options = ThemeMode.entries,
+            selected = theme,
+            label = { stringResource(it.labelRes()) },
+            onDismiss = { dialog = "" },
+            onSelect = { vm.setTheme(it); dialog = "" },
+        )
+        "mode" -> ChoiceDialog(
+            title = stringResource(R.string.cfg_mode),
+            options = TunnelMode.entries,
+            selected = settings.mode,
+            label = { stringResource(it.labelRes()) },
+            onDismiss = { dialog = "" },
+            onSelect = { vm.setMode(it); dialog = "" },
+        )
+        "transport" -> ChoiceDialog(
+            title = stringResource(R.string.cfg_transport),
+            options = Transport.entries,
+            selected = settings.transport,
+            label = { stringResource(it.labelRes()) },
+            onDismiss = { dialog = "" },
+            onSelect = { vm.setTransport(it); dialog = "" },
+        )
+        "ip" -> ChoiceDialog(
+            title = stringResource(R.string.settings_ip),
+            options = IpVersion.entries,
+            selected = settings.ip,
+            label = { stringResource(it.labelRes()) },
+            onDismiss = { dialog = "" },
+            onSelect = { vm.setIp(it); dialog = "" },
+        )
+        "scan" -> ChoiceDialog(
+            title = stringResource(R.string.settings_scan),
+            options = ScanMode.entries,
+            selected = settings.scan,
+            label = { stringResource(it.labelRes()) },
+            onDismiss = { dialog = "" },
+            onSelect = { vm.setScan(it); dialog = "" },
+        )
+        "noize" -> ChoiceDialog(
+            title = stringResource(R.string.settings_noize),
+            options = NoizeProfile.entries,
+            selected = settings.noize,
+            label = { stringResource(it.labelRes()) },
+            onDismiss = { dialog = "" },
+            onSelect = { vm.setNoize(it); dialog = "" },
+        )
+    }
+
+    if (country) {
+        CountryPickerDialog(
+            selected = settings.psiphonRegion,
+            onDismiss = { country = false },
+            onPick = { vm.setRegion(it); country = false },
+            onClear = { vm.setRegion(null); country = false },
+        )
     }
 }
 
 @Composable
-private fun <T> ChoiceCard(
+private fun <T> ChoiceDialog(
     title: String,
-    hint: String,
     options: List<T>,
     selected: T,
-    enabled: Boolean,
     label: @Composable (T) -> String,
+    onDismiss: () -> Unit,
     onSelect: (T) -> Unit,
 ) {
-    val scheme = MaterialTheme.colorScheme
-    Card(
-        Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainer),
-    ) {
-        Column(Modifier.padding(vertical = 14.dp)) {
-            Text(
-                title,
-                modifier = Modifier.padding(horizontal = 16.dp),
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                hint,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
-                fontSize = 12.sp,
-                color = scheme.onSurfaceVariant,
-            )
-            options.forEach { option ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = enabled, role = Role.RadioButton) { onSelect(option) }
-                        .padding(end = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
-                        selected = option == selected,
-                        onClick = { onSelect(option) },
-                        enabled = enabled,
-                    )
-                    Text(label(option))
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                items(options) { option ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(option) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = option == selected, onClick = { onSelect(option) })
+                        Text(label(option), fontSize = 15.sp)
+                    }
                 }
             }
-        }
-    }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
 }

@@ -7,13 +7,16 @@ data class EngineEndpoint(val host: String, val port: Int)
 
 class EngineUnavailableException(message: String) : Exception(message)
 
+/** One line the core printed, kept with the moment it arrived. */
+data class LogEntry(val timeMillis: Long, val text: String)
+
 /** Snapshot of the core process, for the diagnostics screen. */
 data class EngineStatus(
     val running: Boolean = false,
     val pid: Long? = null,
     val endpoint: EngineEndpoint? = null,
     val exitCode: Int? = null,
-    val lastLog: List<String> = emptyList(),
+    val lastLog: List<LogEntry> = emptyList(),
 )
 
 /**
@@ -34,6 +37,9 @@ interface TunnelEngine {
     val isAlive: Boolean
 
     fun status(): EngineStatus = EngineStatus(running = isAlive)
+
+    /** Drops the captured output; the Logs screen offers this as "clear". */
+    fun clearLog() = Unit
 }
 
 /**

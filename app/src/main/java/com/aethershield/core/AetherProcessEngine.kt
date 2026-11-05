@@ -28,7 +28,7 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
 
     private val processLock = Any()
     private val logLock = Any()
-    private val tail = ArrayDeque<String>()
+    private val tail = ArrayDeque<LogEntry>()
 
     @Volatile
     private var process: Process? = null
@@ -124,6 +124,10 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
         return binary.absolutePath
     }
 
+    override fun clearLog() {
+        synchronized(logLock) { tail.clear() }
+    }
+
     override suspend fun stop() = withContext(Dispatchers.IO) { stopInternal(graceful = true) }
 
     override fun stopNow() = stopInternal(graceful = false)
@@ -174,7 +178,7 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
                 p.inputStream.bufferedReader().forEachLine { line ->
                     Log.d(TAG, line)
                     synchronized(logLock) {
-                        tail.addLast(line)
+                        tail.addLast(LogEntry(System.currentTimeMillis(), line))
                         while (tail.size > TAIL_LINES) tail.removeFirst()
                     }
                 }
@@ -194,7 +198,7 @@ class AetherProcessEngine(private val context: Context) : TunnelEngine {
     }
 
     private fun lastLines(): String =
-        synchronized(logLock) { tail.takeLast(5).joinToString(" | ") }.ifBlank { "(no output)" }
+        synchronized(logLock) { tail.takeLast(5).joinToString(" | ") { it.text } }.ifBlank { "(no output)" }
 
     companion object {
         /** Must match the binary in jniLibs/arm64-v8a/. */

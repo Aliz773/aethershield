@@ -39,13 +39,15 @@ data class SharedClient(
 /** What the sharing screen shows. */
 data class SharingState(
     val running: Boolean = false,
-    val port: Int = DEFAULT_PORT,
+    val httpPort: Int = DEFAULT_HTTP_PORT,
+    val socksPort: Int = DEFAULT_SOCKS_PORT,
     val error: String? = null,
     val clients: List<SharedClient> = emptyList(),
 ) {
     companion object {
-        /** One port for both protocols: the first byte tells SOCKS5 (0x05) from HTTP. */
-        const val DEFAULT_PORT = 10810
+        /** Fixed, documented ports: they are what a guest types into its proxy settings. */
+        const val DEFAULT_HTTP_PORT = 8080
+        const val DEFAULT_SOCKS_PORT = 1080
     }
 }
 

@@ -50,6 +50,8 @@ class ConnectionManager(
     private val timing: Timing = Timing(),
     private val probe: (EngineEndpoint) -> Boolean = DEFAULT_PROBE,
     private val exitFinder: ExitFinder = SocksExitFinder,
+    /** Blocking latency measurement through the tunnel; injectable so tests stay offline. */
+    private val latency: (EngineEndpoint) -> Int? = DEFAULT_LATENCY,
 ) {
     data class Timing(
         /** How often the monitor wakes up; also the traffic sampling period. */
@@ -69,6 +71,8 @@ class ConnectionManager(
         val exitRefreshMs: Long = 60_000,
         /** How often to retry when the exit could not be learned yet. */
         val exitRetryMs: Long = 15_000,
+        /** How often the latency through the tunnel is re-measured. */
+        val pingIntervalMs: Long = 10_000,
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -84,6 +88,10 @@ class ConnectionManager(
     private val _exit = MutableStateFlow<ExitInfo?>(null)
     val exitInfo: StateFlow<ExitInfo?> = _exit.asStateFlow()
 
+    /** Measured latency through the tunnel, in milliseconds; null until it is known. */
+    private val _ping = MutableStateFlow<Int?>(null)
+    val ping: StateFlow<Int?> = _ping.asStateFlow()
+
     /** The SOCKS5 port of the running tunnel; null when there is nothing to share. */
     private val _endpoint = MutableStateFlow<EngineEndpoint?>(null)
     val activeEndpoint: StateFlow<EngineEndpoint?> = _endpoint.asStateFlow()
@@ -96,6 +104,8 @@ class ConnectionManager(
     private var session: Job? = null
 
     fun engineStatus(): EngineStatus = engine.status()
+
+    fun clearLogs() = engine.clearLog()
 
     /** The returned Job completes when the session has ended (Connected kept, or Error). */
     fun connect(settings: VpnSettings, host: TunnelHost): Job = scope.launch {
@@ -215,10 +225,19 @@ class ConnectionManager(
             } catch (_: Throwable) {
             }
         }
+        val pinger = launch {
+            try {
+                pollPing(endpoint)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+            }
+        }
         try {
             watchLoop(endpoint, host)
         } finally {
             lookup.cancel()
+            pinger.cancel()
         }
     }
 
@@ -268,6 +287,16 @@ class ConnectionManager(
         }
     }
 
+    private suspend fun pollPing(endpoint: EngineEndpoint) {
+        while (currentCoroutineContext().isActive) {
+            val millis = withContext(Dispatchers.IO) {
+                runCatching { latency(endpoint) }.getOrNull()
+            }
+            _ping.value = millis
+            delay(timing.pingIntervalMs)
+        }
+    }
+
     private fun fail(host: TunnelHost, message: String) {
         engine.stopNow()
         host.detach()
@@ -281,6 +310,7 @@ class ConnectionManager(
         _exit.value = null
         _activeMode.value = null
         _endpoint.value = null
+        _ping.value = null
     }
 
     private suspend fun safeStop() {
@@ -301,6 +331,15 @@ class ConnectionManager(
         /** Cloudflare answers HTTPS here, so a granted CONNECT means traffic really flowed. */
         private const val PROBE_TARGET_HOST = "1.1.1.1"
         private const val PROBE_TARGET_PORT = 443
+
+        private val DEFAULT_LATENCY: (EngineEndpoint) -> Int? = { endpoint ->
+            SocksProbe.connectMillis(
+                host = endpoint.host,
+                port = endpoint.port,
+                targetHost = PROBE_TARGET_HOST,
+                targetPort = PROBE_TARGET_PORT,
+            )
+        }
 
         private val DEFAULT_PROBE: (EngineEndpoint) -> Boolean = { endpoint ->
             SocksProbe.connectsThrough(

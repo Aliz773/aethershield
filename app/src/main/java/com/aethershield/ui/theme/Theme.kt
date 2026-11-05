@@ -11,51 +11,64 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.aethershield.core.ThemeMode
 
-/** AMOLED: true black, so the panel can actually switch pixels off. */
-private val Amoled = darkColorScheme(
-    primary = Color(0xFF5EEAD4),
-    onPrimary = Color.Black,
+/**
+ * The premium dark look: near-black background, slightly lifted cards, one cyan accent.
+ * AMOLED is the same design with true black so an OLED panel can switch pixels off.
+ */
+private fun darkScheme(background: Color, container: Color, containerHigh: Color) = darkColorScheme(
+    primary = Palette.Cyan,
+    onPrimary = Color(0xFF00131A),
+    primaryContainer = Palette.Cyan.copy(alpha = 0.16f),
+    onPrimaryContainer = Palette.Cyan,
+    secondary = Palette.Blue,
+    onSecondary = Color.White,
+    background = background,
+    onBackground = Palette.TextPrimary,
+    surface = background,
+    onSurface = Palette.TextPrimary,
+    surfaceVariant = container,
+    onSurfaceVariant = Palette.TextSecondary,
+    surfaceContainer = container,
+    surfaceContainerHigh = containerHigh,
+    surfaceContainerHighest = containerHigh,
+    outline = Palette.Divider,
+    outlineVariant = Palette.Divider,
+    error = Palette.Red,
+    onError = Color.White,
+)
+
+private val PremiumDark = darkScheme(
+    background = Palette.Background,
+    container = Palette.Surface,
+    containerHigh = Palette.SurfaceElevated,
+)
+
+private val AmoledDark = darkScheme(
     background = Color.Black,
-    onBackground = Color(0xFFEDEDED),
-    surface = Color.Black,
-    onSurface = Color(0xFFEDEDED),
-    onSurfaceVariant = Color(0xFF9A9A9A),
-    surfaceContainer = Color(0xFF111111),
-    surfaceContainerHigh = Color(0xFF171717),
-    outline = Color(0xFF444444),
-    error = Color(0xFFFF6B6B),
-    onError = Color.Black,
+    container = Palette.BackgroundDeep,
+    containerHigh = Palette.Surface,
 )
 
-/** Ordinary dark: cards sit on a slightly lighter grey, not on pure black. */
-private val Dark = darkColorScheme(
-    primary = Color(0xFF5EEAD4),
-    onPrimary = Color(0xFF00382F),
-    background = Color(0xFF121212),
-    onBackground = Color(0xFFE8E8E8),
-    surface = Color(0xFF121212),
-    onSurface = Color(0xFFE8E8E8),
-    onSurfaceVariant = Color(0xFFAAAAAA),
-    surfaceContainer = Color(0xFF1E1E1E),
-    surfaceContainerHigh = Color(0xFF262626),
-    outline = Color(0xFF5C5C5C),
-    error = Color(0xFFFF6B6B),
-    onError = Color.Black,
-)
-
-/** Light: the same teal brand, on paper. */
-private val Light = lightColorScheme(
-    primary = Color(0xFF0F766E),
+/** Light is not in the reference, so it is the same design on paper with the same accent. */
+private val LightScheme = lightColorScheme(
+    primary = Color(0xFF0087A8),
     onPrimary = Color.White,
-    background = Color(0xFFF7F8F8),
-    onBackground = Color(0xFF161616),
-    surface = Color(0xFFF7F8F8),
-    onSurface = Color(0xFF161616),
-    onSurfaceVariant = Color(0xFF5F6368),
-    surfaceContainer = Color(0xFFFFFFFF),
-    surfaceContainerHigh = Color(0xFFEDEFEE),
-    outline = Color(0xFFC2C6C4),
-    error = Color(0xFFB3261E),
+    primaryContainer = Color(0xFF00C8F0).copy(alpha = 0.14f),
+    onPrimaryContainer = Color(0xFF00566A),
+    secondary = Color(0xFF0A6FD1),
+    onSecondary = Color.White,
+    background = Color(0xFFF6F8FA),
+    onBackground = Color(0xFF0E141B),
+    surface = Color(0xFFF6F8FA),
+    onSurface = Color(0xFF0E141B),
+    surfaceVariant = Color(0xFFEDF1F5),
+    onSurfaceVariant = Color(0xFF5A6673),
+    surfaceContainer = Color.White,
+    surfaceContainerHigh = Color(0xFFEFF3F6),
+    surfaceContainerHighest = Color(0xFFE7ECF1),
+    outline = Color(0xFFD3DAE2),
+    outlineVariant = Color(0xFFE2E8EE),
+    error = Color(0xFFC62828),
     onError = Color.White,
 )
 
@@ -70,14 +83,13 @@ fun AetherShieldTheme(
         ThemeMode.DARK, ThemeMode.AMOLED -> true
     }
     val scheme = when {
-        mode == ThemeMode.AMOLED -> Amoled
-        dark -> Dark
-        else -> Light
+        mode == ThemeMode.AMOLED -> AmoledDark
+        dark -> PremiumDark
+        else -> LightScheme
     }
 
     // enableEdgeToEdge() picks its bar icons from the *phone's* setting, so a light theme on
-    // a dark phone would leave dark icons on a light background (invisible). Follow the app's
-    // own choice instead.
+    // a dark phone would leave dark icons on a light background. Follow the app's own choice.
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -89,5 +101,5 @@ fun AetherShieldTheme(
         }
     }
 
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(colorScheme = scheme, typography = AetherTypography, content = content)
 }

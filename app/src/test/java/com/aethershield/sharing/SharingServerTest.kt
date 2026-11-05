@@ -24,7 +24,8 @@ class SharingServerTest {
     private lateinit var socks: ServerSocket
     private lateinit var sharing: SharingServer
 
-    private val sharePort: Int get() = sharing.snapshot().port
+    private val socksPort: Int get() = sharing.snapshot().socksPort
+    private val httpPort: Int get() = sharing.snapshot().httpPort
 
     @Before
     fun setUp() {
@@ -35,7 +36,7 @@ class SharingServerTest {
         thread(isDaemon = true) { acceptLoop(socks) { fakeSocksUpstream(it) } }
 
         sharing = SharingServer { EngineEndpoint("127.0.0.1", socks.localPort) }
-        assertTrue("share server must bind", sharing.start(0))
+        assertTrue("share server must bind", sharing.start(0, 0))
     }
 
     @After
@@ -135,7 +136,7 @@ class SharingServerTest {
 
     @Test
     fun aSocks5GuestReachesTheTargetAndIsListed() {
-        Socket("127.0.0.1", sharePort).use { guest ->
+        Socket("127.0.0.1", socksPort).use { guest ->
             guest.soTimeout = 5_000
             val out = guest.getOutputStream()
             val input = guest.getInputStream()
@@ -173,7 +174,7 @@ class SharingServerTest {
 
     @Test
     fun anHttpGuestConnectsAndItsOperatingSystemIsGuessed() {
-        Socket("127.0.0.1", sharePort).use { guest ->
+        Socket("127.0.0.1", httpPort).use { guest ->
             guest.soTimeout = 5_000
             val out = guest.getOutputStream()
             val input = guest.getInputStream()
@@ -204,9 +205,9 @@ class SharingServerTest {
     @Test
     fun withoutATunnelTheGuestIsToldTheUpstreamIsGone() {
         val offline = SharingServer { null }
-        assertTrue(offline.start(0))
+        assertTrue(offline.start(0, 0))
         try {
-            Socket("127.0.0.1", offline.snapshot().port).use { guest ->
+            Socket("127.0.0.1", offline.snapshot().httpPort).use { guest ->
                 guest.soTimeout = 5_000
                 guest.getOutputStream().write("CONNECT example.com:443 HTTP/1.1\r\n\r\n".toByteArray())
                 guest.getOutputStream().flush()
@@ -220,7 +221,7 @@ class SharingServerTest {
 
     @Test
     fun stoppingTheShareClosesTheListener() {
-        val port = sharePort
+        val port = socksPort
         sharing.stop()
 
         assertTrue("not running after stop", !sharing.snapshot().running)
