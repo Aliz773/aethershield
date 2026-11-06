@@ -23,17 +23,17 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
-            abiFilters += "arm64-v8a"
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 
-    // Only arm64 native libraries exist, so only arm64 APKs are produced. A split + a
-    // universal APK is still worth it: the universal one is what a normal user downloads.
+    // arm64-v8a, armeabi-v7a and x86_64 all have a matching aether / psiphon / hev build.
+    // There is no x86 (32-bit Intel) core, so that one is deliberately absent.
     splits {
         abi {
             isEnable = true
             reset()
-            include("arm64-v8a")
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
             isUniversalApk = true
         }
     }

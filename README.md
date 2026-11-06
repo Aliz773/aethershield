@@ -6,7 +6,7 @@ through it with a real `VpnService` TUN, and keeps the interface simple enough t
 understanding any of that.
 
 <p align="center">
-  <b>Android 10+ (API 29) · arm64-v8a · Kotlin + Jetpack Compose</b>
+  <b>Android 10+ (API 29) · arm64-v8a, armeabi-v7a, x86_64 · Kotlin + Jetpack Compose</b>
 </p>
 
 ---
@@ -63,8 +63,8 @@ Psiphon does not serve makes the tunnel fail and the app retry forever.
 ## Requirements
 
 - Android 10 (API 29) or newer.
-- **arm64-v8a** device. The bundled native binaries are 64-bit ARM only; there is no 32-bit, x86 or
-  x86_64 build because no such Aether/Psiphon/HEV binaries ship with the project.
+- A device on one of the bundled ABIs: **arm64-v8a**, **armeabi-v7a** or **x86_64**. There is no
+  `x86` (32-bit Intel) build because Aether does not publish an x86 core.
 
 ## Download
 
@@ -72,8 +72,10 @@ APKs are attached to [GitHub Releases](https://github.com/Aliz773/aethershield/r
 
 | Variant | Use |
 |---|---|
-| `app-universal-release.apk` | normal install, pick this if unsure |
-| `app-arm64-v8a-release.apk` | same as universal for this project (arm64 is the only ABI) |
+| `AetherShield-v1.2-universal.apk` | works on every supported ABI; pick this if unsure |
+| `AetherShield-v1.2-arm64-v8a.apk` | almost every modern phone |
+| `AetherShield-v1.2-armeabi-v7a.apk` | older 32-bit ARM phones |
+| `AetherShield-v1.2-x86_64.apk` | Chromebooks and x86_64 emulators |
 
 Release APKs are signed with the project key; debug builds are signed with the debug key.
 
@@ -102,8 +104,8 @@ Without those, `assembleRelease` still builds but produces an unsigned APK.
 
 ### Native core integration
 
-Three prebuilt binaries live in `app/src/main/jniLibs/arm64-v8a/` and are run as processes, not
-loaded as libraries:
+The same three prebuilt binaries are placed in `app/src/main/jniLibs/<abi>/` for each supported ABI
+(`arm64-v8a`, `armeabi-v7a`, `x86_64`), and are run as processes, not loaded as libraries:
 
 | File | What it is |
 |---|---|
@@ -111,9 +113,10 @@ loaded as libraries:
 | `libpsiphon-tunnel-core.so` | Psiphon's companion client from the same release archive |
 | `libhev-socks5-tunnel.so` | HEV's TUN → SOCKS5 forwarder, loaded through JNI |
 
-They come from the official Aether v2.4.0 release archive
-(`aether-android-arm64.tar.gz`, sha256 `02f1a1d6…2073c`); the `aether` binary inside is byte-identical
-to `libaether_cli.so`. `TProxyService` must stay in package `hev.htproxy` because the HEV JNI looks it
+They come from the official Aether v2.4.0 Android archives (`aether-android-arm64.tar.gz`,
+`…-armv7.tar.gz`, `…-x86_64.tar.gz` — the `aether` binary inside the arm64 archive is byte-identical to
+`libaether_cli.so`), and `libhev-socks5-tunnel.so` from hev-socks5-tunnel 2.19.3's per-ABI Android
+builds. Every download was checked against its published sha256. `TProxyService` must stay in package `hev.htproxy` because the HEV JNI looks it
 up by name — `app/src/main/keepRules/rules.keep` enforces that under R8.
 
 ## Update system
