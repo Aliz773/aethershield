@@ -28,8 +28,15 @@ jobs:
       - name: Install SDK packages
         run: |
           set -e
-          sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          # The runner image keeps cmdline-tools in a versioned folder and does not put
+          # sdkmanager on PATH, so find it explicitly.
+          SDKM="$(ls "$SDK"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)"
+          if [ -z "$SDKM" ]; then echo "sdkmanager not found under $SDK"; exit 1; fi
+          yes | "$SDKM" --licenses > /dev/null 2>&1 || true
+          "$SDKM" "platform-tools" || true
+          "$SDKM" "build-tools;36.0.0" || true
+          "$SDKM" "platforms;android-37" || echo "platform 37 not offered by the repository yet"
 
       # The executable bit does not survive a Windows checkout, so set it here.
       - name: Make gradlew executable
