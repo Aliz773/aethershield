@@ -5,6 +5,8 @@ import com.aethershield.core.EngineEndpoint
 import com.aethershield.core.EngineStatus
 import com.aethershield.core.ExitFinder
 import com.aethershield.core.ExitInfo
+import com.aethershield.core.LatencyState
+import com.aethershield.core.TunnelLatency
 import com.aethershield.core.SocksExitFinder
 import com.aethershield.core.SocksProbe
 import com.aethershield.core.SmartPlan
@@ -51,7 +53,7 @@ class ConnectionManager(
     private val probe: (EngineEndpoint) -> Boolean = DEFAULT_PROBE,
     private val exitFinder: ExitFinder = SocksExitFinder,
     /** Blocking latency measurement through the tunnel; injectable so tests stay offline. */
-    private val latency: (EngineEndpoint) -> Int? = DEFAULT_LATENCY,
+    private val latencyProbe: (EngineEndpoint) -> LatencyState = DEFAULT_LATENCY,
 ) {
     data class Timing(
         /** How often the monitor wakes up; also the traffic sampling period. */
@@ -88,9 +90,9 @@ class ConnectionManager(
     private val _exit = MutableStateFlow<ExitInfo?>(null)
     val exitInfo: StateFlow<ExitInfo?> = _exit.asStateFlow()
 
-    /** Measured latency through the tunnel, in milliseconds; null until it is known. */
-    private val _ping = MutableStateFlow<Int?>(null)
-    val ping: StateFlow<Int?> = _ping.asStateFlow()
+    /** Real latency through the tunnel: measured, timed out, or not measured yet. */
+    private val _latency = MutableStateFlow<LatencyState>(LatencyState.Unknown)
+    val latency: StateFlow<LatencyState> = _latency.asStateFlow()
 
     /** The SOCKS5 port of the running tunnel; null when there is nothing to share. */
     private val _endpoint = MutableStateFlow<EngineEndpoint?>(null)
@@ -289,10 +291,10 @@ class ConnectionManager(
 
     private suspend fun pollPing(endpoint: EngineEndpoint) {
         while (currentCoroutineContext().isActive) {
-            val millis = withContext(Dispatchers.IO) {
-                runCatching { latency(endpoint) }.getOrNull()
+            val measured = withContext(Dispatchers.IO) {
+                runCatching { latencyProbe(endpoint) }.getOrElse { LatencyState.Timeout }
             }
-            _ping.value = millis
+            _latency.value = measured
             delay(timing.pingIntervalMs)
         }
     }
@@ -310,7 +312,7 @@ class ConnectionManager(
         _exit.value = null
         _activeMode.value = null
         _endpoint.value = null
-        _ping.value = null
+        _latency.value = LatencyState.Unknown
     }
 
     private suspend fun safeStop() {
@@ -332,13 +334,8 @@ class ConnectionManager(
         private const val PROBE_TARGET_HOST = "1.1.1.1"
         private const val PROBE_TARGET_PORT = 443
 
-        private val DEFAULT_LATENCY: (EngineEndpoint) -> Int? = { endpoint ->
-            SocksProbe.connectMillis(
-                host = endpoint.host,
-                port = endpoint.port,
-                targetHost = PROBE_TARGET_HOST,
-                targetPort = PROBE_TARGET_PORT,
-            )
+        private val DEFAULT_LATENCY: (EngineEndpoint) -> LatencyState = { endpoint ->
+            TunnelLatency.measure(proxyHost = endpoint.host, proxyPort = endpoint.port)
         }
 
         private val DEFAULT_PROBE: (EngineEndpoint) -> Boolean = { endpoint ->

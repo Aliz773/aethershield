@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +43,6 @@ import androidx.annotation.StringRes
 import com.aethershield.AppContainer
 import com.aethershield.R
 import com.aethershield.core.ThemeMode
-import com.aethershield.ui.components.GlyphBars
 import com.aethershield.ui.components.GlyphLines
 import com.aethershield.ui.theme.AetherShieldTheme
 import com.aethershield.ui.theme.AetherText
@@ -50,7 +50,7 @@ import com.aethershield.ui.theme.Radius
 import com.aethershield.ui.theme.Space
 
 /** Every destination, including the two that are reached from elsewhere rather than a tab. */
-enum class Route { HOME, STATS, LOGS, SETTINGS, SHARING, ABOUT }
+enum class Route { HOME, SHARING, LOGS, SETTINGS, ABOUT }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,7 +88,6 @@ fun AetherShieldApp() {
                     onOpenAbout = { route = Route.ABOUT },
                 )
 
-                Route.STATS -> StatsScreen()
                 Route.LOGS -> LogsScreen()
                 Route.SETTINGS -> SettingsScreen(
                     onOpenSharing = { route = Route.SHARING },
@@ -116,8 +115,8 @@ private fun AetherBottomNavigation(current: Route, onSelect: (Route) -> Unit) {
         NavItem(Route.HOME, R.string.nav_home) { tint ->
             Icon(Icons.Default.Home, contentDescription = null, tint = tint, modifier = Modifier.size(21.dp))
         },
-        NavItem(Route.STATS, R.string.nav_stats) { tint ->
-            GlyphBars(tint = tint, modifier = Modifier.size(21.dp))
+        NavItem(Route.SHARING, R.string.nav_sharing) { tint ->
+            Icon(Icons.Default.Share, contentDescription = null, tint = tint, modifier = Modifier.size(21.dp))
         },
         NavItem(Route.LOGS, R.string.nav_logs) { tint ->
             GlyphLines(tint = tint, modifier = Modifier.size(21.dp))

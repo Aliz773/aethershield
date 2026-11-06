@@ -51,7 +51,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
+import com.aethershield.R
 import com.aethershield.core.ConnectionState
+import com.aethershield.core.LatencyState
 import com.aethershield.ui.theme.AetherText
 import com.aethershield.ui.theme.Palette
 import com.aethershield.ui.theme.Radius
@@ -280,24 +285,77 @@ fun ConnectionStatusText(
     }
 }
 
-/** Latency, colour-coded, with an honest dash when it was never measured. */
+/** Latency, colour-coded. "-- ms" means never measured, "Timeout" means it failed. */
 @Composable
-fun PingIndicator(millis: Int?, modifier: Modifier = Modifier, compact: Boolean = true) {
+fun PingIndicator(state: LatencyState, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val color = when {
-        millis == null -> scheme.onSurfaceVariant
-        millis <= 80 -> Palette.Green
-        millis <= 150 -> Palette.Amber
-        else -> Palette.Red
+    val color = when (state) {
+        is LatencyState.Measured -> when {
+            state.millis <= 80 -> Palette.Green
+            state.millis <= 150 -> Palette.Amber
+            else -> Palette.Red
+        }
+        else -> scheme.onSurfaceVariant
+    }
+    val text = when (state) {
+        LatencyState.Unknown -> "-- ms"
+        LatencyState.Timeout -> stringResource(R.string.latency_timeout)
+        is LatencyState.Measured -> "${state.millis} ms"
     }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        GlyphSignal(tint = color, modifier = Modifier.size(if (compact) 13.dp else 16.dp))
+        GlyphSignal(tint = color, modifier = Modifier.size(13.dp))
         Spacer(Modifier.width(5.dp))
-        Text(
-            text = millis?.let { "$it ms" } ?: "-- ms",
-            style = AetherText.label,
-            color = color,
-        )
+        Text(text = text, style = AetherText.label, color = color)
+    }
+}
+
+/** A tappable option in a grid: rounded card, clear selected state, real press feedback. */
+@Composable
+fun AetherSelectionCard(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(18.dp)
+    val background = when {
+        !enabled -> scheme.surfaceContainer.copy(alpha = 0.5f)
+        selected -> scheme.primary.copy(alpha = 0.16f)
+        else -> scheme.surfaceContainerHigh
+    }
+    val border = when {
+        selected -> scheme.primary.copy(alpha = 0.65f)
+        else -> scheme.outline.copy(alpha = 0.45f)
+    }
+    Box(
+        modifier
+            .heightIn(min = 64.dp)
+            .clip(shape)
+            .background(background)
+            .border(1.dp, border, shape)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            if (selected) {
+                Text("\u2713", color = scheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(6.dp))
+            }
+            Text(
+                text = label,
+                style = AetherText.body.copy(fontWeight = FontWeight.Medium),
+                color = if (enabled) scheme.onSurface else scheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

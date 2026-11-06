@@ -22,6 +22,11 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -29,7 +34,10 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
@@ -64,6 +72,8 @@ import com.aethershield.AppContainer
 import com.aethershield.R
 import com.aethershield.core.ConnectionState
 import com.aethershield.core.ExitInfo
+import com.aethershield.core.IpVersion
+import com.aethershield.core.LatencyState
 import com.aethershield.core.TrafficSnapshot
 import com.aethershield.core.Transport
 import com.aethershield.core.TunnelMode
@@ -76,7 +86,9 @@ import com.aethershield.data.SettingsRepository
 import com.aethershield.ui.components.AetherCard
 import com.aethershield.ui.components.AetherChevron
 import com.aethershield.ui.components.AetherConnectionButton
+import com.aethershield.ui.components.AetherIconButton
 import com.aethershield.ui.components.AetherInfoRow
+import com.aethershield.ui.components.AetherSelectionCard
 import com.aethershield.ui.components.AetherTopBar
 import com.aethershield.ui.components.ConnectionStatusText
 import com.aethershield.ui.components.GlyphGlobe
@@ -103,13 +115,14 @@ class HomeViewModel(
     val traffic: StateFlow<TrafficSnapshot> = manager.traffic
     val exitInfo: StateFlow<ExitInfo?> = manager.exitInfo
     val activeMode: StateFlow<TunnelMode?> = manager.activeMode
-    val ping: StateFlow<Int?> = manager.ping
+    val latency: StateFlow<LatencyState> = manager.latency
     val settings: StateFlow<VpnSettings> =
         repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, VpnSettings())
 
     fun setMode(m: TunnelMode) { viewModelScope.launch { repo.setMode(m) } }
     fun setTransport(t: Transport) { viewModelScope.launch { repo.setTransport(t) } }
     fun setRegion(code: String?) { viewModelScope.launch { repo.setPsiphonRegion(code) } }
+    fun setIp(v: IpVersion) { viewModelScope.launch { repo.setIpVersion(v) } }
 
     companion object {
         val Factory = viewModelFactory {
@@ -138,7 +151,7 @@ fun HomeScreen(
     val traffic by vm.traffic.collectAsState()
     val exit by vm.exitInfo.collectAsState()
     val activeMode by vm.activeMode.collectAsState()
-    val ping by vm.ping.collectAsState()
+    val latency by vm.latency.collectAsState()
     val settings by vm.settings.collectAsState()
 
     var showSheet by remember { mutableStateOf(false) }
@@ -248,7 +261,7 @@ fun HomeScreen(
 
         ServerCard(
             exit = exit,
-            ping = ping,
+            latency = latency,
             regionCode = settings.psiphonRegion,
             canPickCountry = settings.mode.hasSelectableCountry,
             onPickCountry = { showCountryPicker = true },
@@ -290,38 +303,64 @@ fun HomeScreen(
         ) {
             Column(
                 Modifier
+                    .fillMaxWidth()
                     .padding(horizontal = Space.screen)
-                    .padding(bottom = Space.section)
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                    .navigationBarsPadding(),
             ) {
-                Text(stringResource(R.string.cfg_mode), style = AetherText.cardTitle, color = scheme.onSurface)
-                TunnelMode.entries.forEach { mode ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radius.small))
-                            .clickable(enabled = !locked) { vm.setMode(mode) },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = settings.mode == mode,
-                            onClick = { vm.setMode(mode) },
-                            enabled = !locked,
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.cfg_title),
+                        style = AetherText.screenTitle.copy(fontSize = 22.sp),
+                        color = scheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    AetherIconButton(onClick = { showSheet = false }) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = null,
+                            tint = scheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
                         )
-                        Text(stringResource(mode.labelRes()), style = AetherText.body)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                Text(stringResource(R.string.cfg_transport), style = AetherText.cardTitle, color = scheme.onSurface)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Transport.entries.forEach { transport ->
-                        FilterChip(
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 470.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        SectionTitle(stringResource(R.string.cfg_mode))
+                    }
+                    items(TunnelMode.entries) { mode ->
+                        AetherSelectionCard(
+                            label = stringResource(mode.labelRes()),
+                            selected = settings.mode == mode,
+                            enabled = !locked,
+                            onClick = { vm.setMode(mode) },
+                        )
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        SectionTitle(stringResource(R.string.cfg_transport))
+                    }
+                    items(Transport.entries) { transport ->
+                        AetherSelectionCard(
+                            label = stringResource(transport.labelRes()),
                             selected = settings.transport == transport,
-                            onClick = { vm.setTransport(transport) },
-                            label = { Text(stringResource(transport.labelRes())) },
                             enabled = !locked && settings.mode.mayUseMasque,
+                            onClick = { vm.setTransport(transport) },
+                        )
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        SectionTitle(stringResource(R.string.settings_ip))
+                    }
+                    items(IpVersion.entries) { ip ->
+                        AetherSelectionCard(
+                            label = stringResource(ip.labelRes()),
+                            selected = settings.ip == ip,
+                            enabled = !locked,
+                            onClick = { vm.setIp(ip) },
                         )
                     }
                 }
@@ -330,6 +369,7 @@ fun HomeScreen(
                         stringResource(R.string.cfg_transport_na),
                         style = AetherText.label,
                         color = scheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 10.dp),
                     )
                 }
                 if (locked) {
@@ -337,17 +377,29 @@ fun HomeScreen(
                         stringResource(R.string.cfg_locked),
                         style = AetherText.label,
                         color = scheme.error,
+                        modifier = Modifier.padding(top = 10.dp),
                     )
                 }
+                Spacer(Modifier.height(Space.section))
             }
         }
     }
 }
 
 @Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = AetherText.label.copy(fontWeight = FontWeight.SemiBold),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
+    )
+}
+
+@Composable
 private fun ServerCard(
     exit: ExitInfo?,
-    ping: Int?,
+    latency: LatencyState,
     regionCode: String?,
     canPickCountry: Boolean,
     onPickCountry: () -> Unit,
@@ -366,7 +418,7 @@ private fun ServerCard(
             leading = { GlyphServer(tint = scheme.primary, modifier = Modifier.size(22.dp)) },
             trailing = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    PingIndicator(ping)
+                    PingIndicator(latency)
                     Spacer(Modifier.width(8.dp))
                     AetherChevron()
                 }
