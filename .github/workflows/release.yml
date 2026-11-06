@@ -44,16 +44,28 @@ jobs:
         run: ./gradlew testDebugUnitTest --console=plain
 
       # The keystore lives base64-encoded in a repository secret, is written to the runner's
-      # temp dir, used, and removed at the end. It is never printed and never committed.
-      - name: Decode signing key
-        if: ${{ secrets.AETHER_KEYSTORE_BASE64 != '' }}
+      # temp dir, used, and removed at the end. Secrets are never referenced from an "if"
+      # condition (GitHub does not allow that) and never printed.
+      - name: Stage the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.AETHER_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.AETHER_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.AETHER_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.AETHER_KEY_PASSWORD }}
         run: |
           set -e
-          echo "${{ secrets.AETHER_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/aether.jks"
-          echo "AETHER_KEYSTORE_PATH=$RUNNER_TEMP/aether.jks" >> "$GITHUB_ENV"
-          echo "AETHER_KEYSTORE_PASSWORD=${{ secrets.AETHER_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
-          echo "AETHER_KEY_ALIAS=${{ secrets.AETHER_KEY_ALIAS }}" >> "$GITHUB_ENV"
-          echo "AETHER_KEY_PASSWORD=${{ secrets.AETHER_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "No signing key configured; the release build will stay unsigned."
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/aether.jks"
+          {
+            echo "AETHER_KEYSTORE_PATH=$RUNNER_TEMP/aether.jks"
+            echo "AETHER_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "AETHER_KEY_ALIAS=$KEY_ALIAS"
+            echo "AETHER_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "Signing key staged for this run."
 
       - name: Build release APKs
         run: ./gradlew assembleRelease --console=plain
