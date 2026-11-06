@@ -68,7 +68,7 @@ Psiphon does not serve makes the tunnel fail and the app retry forever.
 
 ## Download
 
-APKs are attached to [GitHub Releases](https://github.com/Aliz773/AetherShield/releases):
+APKs are attached to [GitHub Releases](https://github.com/Aliz773/aethershield/releases):
 
 | Variant | Use |
 |---|---|
@@ -80,7 +80,7 @@ Release APKs are signed with the project key; debug builds are signed with the d
 ## Build
 
 ```bash
-git clone https://github.com/Aliz773/AetherShield.git
+git clone https://github.com/Aliz773/aethershield.git
 cd AetherShield
 ./gradlew assembleDebug          # debug APK
 ./gradlew assembleRelease        # R8-minified release APK

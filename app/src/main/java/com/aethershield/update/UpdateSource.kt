@@ -23,7 +23,7 @@ data class UpdateInfo(
 object UpdateSource {
 
     const val OWNER = "Aliz773"
-    const val REPO = "AetherShield"
+    const val REPO = "aethershield"
 
     private const val ENDPOINT = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
     private const val TIMEOUT_MS = 8_000
