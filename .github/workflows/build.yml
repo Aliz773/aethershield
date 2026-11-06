@@ -16,14 +16,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The daemon JVM is pinned to Java 25 in gradle/gradle-daemon-jvm.properties.
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # ubuntu-latest already ships the Android SDK; the setup-android action is not used
+      # because it still asks sdkmanager for a package called "tools" that no longer exists.
+      - name: Install SDK packages
+        run: |
+          set -e
+          sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+
+      # The executable bit does not survive a Windows checkout, so set it here.
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

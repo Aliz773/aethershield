@@ -19,10 +19,16 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install SDK packages
+        run: |
+          set -e
+          sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -30,11 +36,12 @@ jobs:
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --console=plain
 
-      # The keystore is stored base64-encoded in a repository secret. It is written to the
-      # runner's temp dir, used, and never printed.
+      # The keystore lives base64-encoded in a repository secret, is written to the runner's
+      # temp dir, used, and removed at the end. It is never printed and never committed.
       - name: Decode signing key
         if: ${{ secrets.AETHER_KEYSTORE_BASE64 != '' }}
         run: |
+          set -e
           echo "${{ secrets.AETHER_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/aether.jks"
           echo "AETHER_KEYSTORE_PATH=$RUNNER_TEMP/aether.jks" >> "$GITHUB_ENV"
           echo "AETHER_KEYSTORE_PASSWORD=${{ secrets.AETHER_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
@@ -44,24 +51,18 @@ jobs:
       - name: Build release APKs
         run: ./gradlew assembleRelease --console=plain
 
-      - name: Name artifacts and write checksums
+      - name: Collect artifacts and checksums
         run: |
           set -euo pipefail
-          out=app/build/outputs/apk/release
           version="${{ github.event.release.tag_name }}"
           [ -z "$version" ] && version="dev"
           mkdir -p dist
-          for f in "$out"/*.apk; do
+          for f in app/build/outputs/apk/release/*.apk; do
             base=$(basename "$f" .apk)
-            # strip the -unsigned suffix only when a signature was actually applied
-            case "$base" in
-              *-unsigned) ;;
-            esac
             cp "$f" "dist/AetherShield-${version}-${base}.apk"
           done
-          cd dist
-          sha256sum ./*.apk > SHA256SUMS.txt
-          ls -la
+          (cd dist && sha256sum ./*.apk > SHA256SUMS.txt)
+          ls -la dist
 
       - name: Upload to the release
         if: github.event_name == 'release'
