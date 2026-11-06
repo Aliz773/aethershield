@@ -73,6 +73,7 @@ import com.aethershield.R
 import com.aethershield.core.ConnectionState
 import com.aethershield.core.ExitInfo
 import com.aethershield.core.IpVersion
+import com.aethershield.core.PsiphonCountries
 import com.aethershield.core.LatencyState
 import com.aethershield.core.TrafficSnapshot
 import com.aethershield.core.Transport
@@ -292,6 +293,7 @@ fun HomeScreen(
             onDismiss = { showCountryPicker = false },
             onPick = { vm.setRegion(it); showCountryPicker = false },
             onClear = { vm.setRegion(null); showCountryPicker = false },
+            allowedCodes = PsiphonCountries.codes,
         )
     }
 

@@ -50,7 +50,7 @@ object AetherArgs {
         // Only Psiphon has selectable egress regions; a WARP exit is whatever edge the scan
         // landed on, and `--exit-loc` (a reject filter, not a picker) proved useless in practice.
         if (mode.hasSelectableCountry) {
-            settings.psiphonRegion?.takeIf { it.length == 2 }?.let {
+            settings.psiphonRegion?.takeIf { PsiphonCountries.supports(it) }?.let {
                 addAll(listOf("--psiphon-region", it.uppercase()))
             }
         }

@@ -113,3 +113,33 @@ class HttpProxyRequestTest {
         assertNull(HttpProxyRequest.parse(head("CONNECT")))
     }
 }
+
+class DeviceNameTest {
+
+    @Test
+    fun anAndroidUserAgentCarriesTheModel() {
+        val ua = "Mozilla/5.0 (Linux; Android 14; SM-S918B Build/UP1A) AppleWebKit/537.36"
+
+        assertEquals("SM-S918B", deviceName(ua))
+    }
+
+    @Test
+    fun aPixelIsNamedToo() {
+        val ua = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/120"
+
+        assertEquals("Pixel 7", deviceName(ua))
+    }
+
+    @Test
+    fun appleAndDesktopAgentsFallBackToTheFamily() {
+        assertEquals("iPhone", deviceName("Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X)"))
+        assertEquals("iPad", deviceName("Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X)"))
+        assertEquals("Windows PC", deviceName("Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+    }
+
+    @Test
+    fun anUnknownAgentHasNoName() {
+        assertNull(deviceName(null))
+        assertNull(deviceName("curl/8.4.0"))
+    }
+}

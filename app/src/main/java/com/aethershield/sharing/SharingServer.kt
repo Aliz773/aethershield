@@ -36,6 +36,7 @@ class SharingServer(private val upstream: () -> EngineEndpoint?) {
         val protocol: String,
         val userAgent: String?,
         val os: ClientOs,
+        val device: String?,
         val since: Long,
     ) {
         val up = AtomicLong()
@@ -48,6 +49,7 @@ class SharingServer(private val upstream: () -> EngineEndpoint?) {
             protocol = protocol,
             os = os,
             userAgent = userAgent,
+            deviceName = device,
             sinceMillis = since,
             upBytes = up.get(),
             downBytes = down.get(),
@@ -189,6 +191,7 @@ class SharingServer(private val upstream: () -> EngineEndpoint?) {
             protocol = protocol,
             userAgent = userAgent,
             os = ClientOs.fromUserAgent(userAgent),
+            device = deviceName(userAgent),
             since = System.currentTimeMillis(),
         )
         sessions[session.id] = session

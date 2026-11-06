@@ -36,6 +36,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.aethershield.AppContainer
 import com.aethershield.R
 import com.aethershield.core.IpVersion
+import com.aethershield.core.PsiphonCountries
 import com.aethershield.core.NoizeProfile
 import com.aethershield.core.ScanMode
 import com.aethershield.core.ThemeMode
@@ -252,6 +253,7 @@ fun SettingsScreen(
             onDismiss = { country = false },
             onPick = { vm.setRegion(it); country = false },
             onClear = { vm.setRegion(null); country = false },
+            allowedCodes = PsiphonCountries.codes,
         )
     }
 }

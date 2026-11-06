@@ -23,6 +23,31 @@ enum class ClientOs {
     }
 }
 
+/**
+ * The best name a proxy can give a device: a browser tells us its model in the user agent
+ * ("...; Android 14; SM-S918B) ..."), and nothing else ever does. Null when it does not say.
+ */
+fun deviceName(userAgent: String?): String? {
+    val ua = userAgent ?: return null
+    Regex("\\(([^()]*)\\)").findAll(ua).forEach { match ->
+        val inside = match.groupValues[1]
+        val android = inside.substringAfter("Android", "")
+        if (android.isNotEmpty()) {
+            val model = android.substringAfter(';', "").substringBefore(';').trim()
+                .substringBefore(" Build").trim()
+            if (model.isNotEmpty()) return model
+        }
+    }
+    return when {
+        "iphone" in ua.lowercase() -> "iPhone"
+        "ipad" in ua.lowercase() -> "iPad"
+        "windows" in ua.lowercase() -> "Windows PC"
+        "macintosh" in ua.lowercase() -> "Mac"
+        "linux" in ua.lowercase() -> "Linux PC"
+        else -> null
+    }
+}
+
 /** One device using the shared proxy right now. */
 data class SharedClient(
     val id: Long,
@@ -31,6 +56,7 @@ data class SharedClient(
     val protocol: String,
     val os: ClientOs,
     val userAgent: String?,
+    val deviceName: String? = null,
     val sinceMillis: Long,
     val upBytes: Long,
     val downBytes: Long,

@@ -139,10 +139,14 @@ data class VpnSettings(
     val psiphonRegion: String? = null,
 ) {
     /** Returns an error message, or null when the combination is valid. */
-    fun validate(): String? =
-        if (transport == Transport.HTTP2_TCP && !mode.usesMasque)
+    fun validate(): String? = when {
+        transport == Transport.HTTP2_TCP && !mode.usesMasque ->
             "HTTP/2 transport is only valid for MASQUE-based modes"
-        else null
+        // Psiphon only serves a fixed set of exits; asking for another one loops forever.
+        mode.hasSelectableCountry && psiphonRegion != null && !PsiphonCountries.supports(psiphonRegion) ->
+            "Psiphon has no exit in ${psiphonRegion.uppercase()}"
+        else -> null
+    }
 }
 
 /**

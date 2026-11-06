@@ -134,4 +134,21 @@
     <string name="about_package">پکیج</string>
     <string name="about_privacy">بدون حساب، بدون تحلیل، بدون ردیابی.</string>
     <string name="latency_timeout">تایم‌اوت</string>
+    <string name="about_developer">توسعه‌دهنده</string>
+    <string name="about_telegram">تلگرام</string>
+    <string name="about_github">گیت‌هاب — توسعه‌دهنده</string>
+    <string name="about_core_developer">هستهٔ Aether</string>
+    <string name="about_core_github">گیت‌هاب توسعه‌دهندهٔ هسته</string>
+    <string name="about_core_note">موتور VPN را پروژهٔ Aether می‌سازد؛ AetherShield فقط اپ پیرامون آن است.</string>
+    <string name="about_updates">به‌روزرسانی</string>
+    <string name="about_update_ready">نصب‌شده %1$s · موجود %2$s</string>
+    <string name="about_up_to_date">به‌روز است (آخرین نسخه: %1$s)</string>
+    <string name="about_never_checked">هنوز بررسی نشده.</string>
+    <string name="about_check_hint">اپ روزی یک‌بار در پس‌زمینه از گیت‌هاب می‌پرسد؛ زمان دقیق را اندروید تعیین می‌کند.</string>
+    <string name="about_check_now">همین حالا بررسی کن</string>
+    <string name="about_open_release">باز کردن صفحهٔ انتشار</string>
+    <string name="about_copyright">© ۲۰۲۶ آئترشیلد</string>
+    <string name="updates_channel">به‌روزرسانی</string>
+    <string name="update_available">نسخهٔ جدید آئترشیلد موجود است</string>
+    <string name="update_notification_body">نصب‌شده %1$s · جدید %2$s</string>
 </resources>

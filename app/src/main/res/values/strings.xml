@@ -134,4 +134,21 @@
     <string name="about_package">Package</string>
     <string name="about_privacy">No accounts, no analytics, no tracking.</string>
     <string name="latency_timeout">Timeout</string>
+    <string name="about_developer">Developer</string>
+    <string name="about_telegram">Telegram</string>
+    <string name="about_github">GitHub — developer</string>
+    <string name="about_core_developer">Aether core</string>
+    <string name="about_core_github">Core Developer GitHub</string>
+    <string name="about_core_note">The VPN engine is made by the Aether project; AetherShield is the app around it.</string>
+    <string name="about_updates">Updates</string>
+    <string name="about_update_ready">Installed %1$s · available %2$s</string>
+    <string name="about_up_to_date">Up to date (latest known: %1$s)</string>
+    <string name="about_never_checked">Not checked yet.</string>
+    <string name="about_check_hint">The app asks GitHub about once a day in the background; Android decides exactly when.</string>
+    <string name="about_check_now">Check now</string>
+    <string name="about_open_release">Open the release page</string>
+    <string name="about_copyright">© 2026 AetherShield</string>
+    <string name="updates_channel">Updates</string>
+    <string name="update_available">AetherShield update available</string>
+    <string name="update_notification_body">Installed %1$s · new %2$s</string>
 </resources>

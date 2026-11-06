@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -62,7 +63,12 @@ fun CountryPickerDialog(
     onDismiss: () -> Unit,
     onPick: (String) -> Unit,
     onClear: (() -> Unit)? = null,
+    /** null shows every country; a list restricts it (Psiphon only serves a fixed set). */
+    allowedCodes: List<String>? = null,
 ) {
+    val options = remember(allowedCodes) {
+        if (allowedCodes == null) COUNTRIES else COUNTRIES.filter { it.code in allowedCodes }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.country_pick)) },
@@ -85,7 +91,7 @@ fun CountryPickerDialog(
                         }
                     }
                 }
-                items(COUNTRIES, key = { it.code }) { country ->
+                items(options, key = { it.code }) { country ->
                     Row(
                         Modifier
                             .fillMaxWidth()

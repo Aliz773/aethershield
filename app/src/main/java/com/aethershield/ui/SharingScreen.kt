@@ -248,7 +248,7 @@ private fun ClientRow(client: SharedClient) {
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                "${client.os.label()} · ${client.address}",
+                "${client.deviceName ?: client.os.label()} · ${client.address}",
                 style = AetherText.body,
                 color = scheme.onSurface,
             )

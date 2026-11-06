@@ -35,5 +35,7 @@ class AetherShieldApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         AppContainer.init(this)
+        // Android decides when this actually runs; it is a daily-ish check, not a guarantee.
+        com.aethershield.update.UpdateScheduler.schedule(this)
     }
 }
