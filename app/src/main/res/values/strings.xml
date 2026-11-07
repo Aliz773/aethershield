@@ -151,4 +151,6 @@
     <string name="updates_channel">Updates</string>
     <string name="update_available">AetherShield update available</string>
     <string name="update_notification_body">Installed %1$s · new %2$s</string>
+    <string name="widget_tap_hint">Tap to connect</string>
+    <string name="widget_description">Connect and disconnect with your saved settings in one tap</string>
 </resources>

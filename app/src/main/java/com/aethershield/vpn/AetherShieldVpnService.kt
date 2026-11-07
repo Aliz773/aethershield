@@ -7,8 +7,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.view.View
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.aethershield.AppContainer
@@ -20,6 +23,7 @@ import com.aethershield.core.TunCounters
 import com.aethershield.core.TunnelHost
 import com.aethershield.core.labelRes
 import com.aethershield.ui.MainActivity
+import com.aethershield.widget.VpnWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -93,6 +97,7 @@ class AetherShieldVpnService : VpnService() {
                 if (alive) runCatching {
                     getSystemService(NotificationManager::class.java)
                         .notify(NOTIF_ID, buildNotification(s))
+                    VpnWidgetProvider.refresh(this@AetherShieldVpnService)
                 }
             }
         }
@@ -154,15 +159,41 @@ class AetherShieldVpnService : VpnService() {
         val disconnect = PendingIntent.getService(
             this, 1,
             Intent(this, AetherShieldVpnService::class.java).setAction(ACTION_DISCONNECT),
-            PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_IMMUTABLE,
         )
+
+        val accent = when (state) {
+            is ConnectionState.Connected -> 0xFF00C8F0.toInt()
+            is ConnectionState.Error -> 0xFFFF453A.toInt()
+            else -> 0xFFF5F7FA.toInt()
+        }
+        val card = RemoteViews(packageName, R.layout.notification_vpn).apply {
+            setTextViewText(R.id.notif_status, getString(state.labelRes()))
+            setTextColor(R.id.notif_status, accent)
+            val since = (state as? ConnectionState.Connected)?.sinceMillis
+            if (since != null) {
+                setChronometer(R.id.notif_timer, since, null, true)
+                setViewVisibility(R.id.notif_timer, View.VISIBLE)
+            } else {
+                setViewVisibility(R.id.notif_timer, View.GONE)
+            }
+        }
+
         return NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setSmallIcon(R.drawable.ic_stat_vpn)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.notif_large))
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(card)
+            .setCustomBigContentView(card)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(getString(state.labelRes()))
             .setContentIntent(open)
             .addAction(0, getString(R.string.btn_disconnect), disconnect)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
     }
 

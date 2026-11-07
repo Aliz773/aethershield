@@ -32,5 +32,28 @@
                 <action android:name="android.net.VpnService" />
             </intent-filter>
         </service>
+
+        <receiver
+            android:name=".widget.VpnWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.aethershield.widget.TOGGLE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/vpn_widget_info" />
+        </receiver>
+
+        <service
+            android:name=".qs.VpnTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_vpn"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

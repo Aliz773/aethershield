@@ -151,4 +151,6 @@
     <string name="updates_channel">به‌روزرسانی</string>
     <string name="update_available">نسخهٔ جدید آئترشیلد موجود است</string>
     <string name="update_notification_body">نصب‌شده %1$s · جدید %2$s</string>
+    <string name="widget_tap_hint">برای اتصال بزن</string>
+    <string name="widget_description">اتصال و قطع با تنظیمات ذخیره‌شده، با یک ضربه</string>
 </resources>
